@@ -88,7 +88,7 @@ struct PasscodeThemeService: Sendable {
             throw AirCardError.processFailed("El tema no tiene assets para (targetVersion).")
         }
 
-        await progress("Recoloreando las teclas a (Self.hex(color))…")
+        await progress("Recoloreando las teclas a \(Self.hex(color)) y generando variantes --white/--black…")
         let files = try await Task.detached(priority: .userInitiated) {
             try Self.recoloredFiles(selectedAssets, tint: color)
         }.value
@@ -127,13 +127,47 @@ struct PasscodeThemeService: Sendable {
         _ assets: [PasscodeAsset],
         tint: PasscodeTint
     ) throws -> [(String, Data)] {
-        try assets.map { asset in
+        var output: [String: Data] = [:]
+        for asset in assets {
             if !asset.isImage {
-                return (asset.name, asset.data)
+                output[asset.name] = asset.data
+                continue
             }
             let outputName = imageNameAsPNG(asset.name)
-            return (outputName, try recolor(asset.data, tint: tint))
+            let tinted = try recolor(asset.data, tint: tint)
+            output[outputName] = tinted
+
+            // iOS TelephonyUI uses the suffix as part of the cache key. Keep
+            // the original file and also emit both appearance variants so a
+            // theme that only ships --white can be tested against --black.
+            for variant in colorVariantNames(outputName) {
+                output[variant] = tinted
+            }
         }
+        return output
+            .sorted { $0.key < $1.key }
+            .map { ($0.key, $0.value) }
+    }
+
+    private static func colorVariantNames(_ name: String) -> [String] {
+        let stem = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
+        let lowerStem = stem.lowercased()
+        let markers = ["--white-bold", "--black-bold", "--white", "--black"]
+        var base = stem
+        var bold = false
+
+        for marker in markers where lowerStem.hasSuffix(marker) {
+            let end = stem.index(stem.endIndex, offsetBy: -marker.count)
+            base = String(stem[..<end])
+            bold = marker.hasSuffix("-bold")
+            break
+        }
+
+        let boldSuffix = bold ? "-bold" : ""
+        return [
+            "\(base)--white\(boldSuffix).png",
+            "\(base)--black\(boldSuffix).png"
+        ]
     }
 
     private static func recolor(_ data: Data, tint: PasscodeTint) throws -> Data {

@@ -55,6 +55,7 @@ se intentan invalidar sus cachés.
 - Flash por batch y limpieza/restauración de Books.
 - Artwork de tarjetas Apple Pay mediante `cardBackgroundCombined`; el color de los números lo decide iOS.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
+- Generación de variantes de teclado `--white`, `--black`, `--white-bold` y `--black-bold`.
 
 ## Sobre el color de los números
 
@@ -76,6 +77,10 @@ En la app: elige un `.passthm`, selecciona el color, verifica la previsualizaci�
 y pulsa “Aplicar color al teclado”. El port conserva los nombres y variantes del
 paquete, convierte JPG/JPEG a PNG y hace la escritura por lotes con fallback
 individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.
+
+Además de conservar el nombre original, cada imagen genera variantes `--white` y
+`--black`; si la imagen es `-bold`, también se generan `--white-bold` y
+`--black-bold`.
 
 Para tarjetas Apple Pay, iOS dibuja los números y decide su color internamente;
 el port original tampoco modifica `pass.json`, solo reemplaza el artwork y
