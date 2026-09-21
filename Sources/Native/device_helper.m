@@ -419,9 +419,24 @@ static NSData *AFCReadFile(AFCConnectionRef afc, NSString *path) {
     return AFCReadFileWithLimit(afc, path, 16 * 1024 * 1024);
 }
 
+static BOOL IsLowercaseHex(NSString *value, NSUInteger length);
+
+static BOOL IsGeneratedReadPath(NSString *path) {
+    NSArray<NSString *> *parts = [path componentsSeparatedByString:@"/"];
+    if (parts.count != 6 ||
+        ![parts[0] hasPrefix:AIRLIFT_SOURCE_PREFIX] ||
+        ![parts[1] isEqual:@"p0"] ||
+        ![parts[2] isEqual:@"p1"] ||
+        ![parts[3] isEqual:@"p2"] ||
+        ![parts[4] isEqual:@"link"] ||
+        ![parts[5] isEqual:@"pass.json"]) return NO;
+    NSString *token = [parts[0] substringFromIndex:AIRLIFT_SOURCE_PREFIX.length];
+    return IsLowercaseHex(token, 20);
+}
+
 static NSDictionary *ReadPassFile(AFCConnectionRef afc, NSString *path) {
     NSString *prefix = @"/var/mobile/Library/Passes/Cards/";
-    BOOL allowed = [path hasPrefix:prefix] &&
+    BOOL allowed = ([path hasPrefix:prefix] || IsGeneratedReadPath(path)) &&
         ![path containsString:@".."] &&
         [path.lastPathComponent isEqual:@"pass.json"];
     if (!allowed) {
@@ -430,7 +445,9 @@ static NSDictionary *ReadPassFile(AFCConnectionRef afc, NSString *path) {
 
     NSData *data = AFCReadFileWithLimit(afc, path, 2 * 1024 * 1024);
     if (!data) {
-        return @{ @"ok": @NO, @"error": @"pass.json unavailable" };
+        return @{ @"ok": @NO,
+                  @"error": @"pass.json unavailable through AFC",
+                  @"path": path };
     }
     return @{ @"ok": @YES,
               @"path": path,

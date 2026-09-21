@@ -76,7 +76,11 @@ struct WalletSkinService: Sendable {
         if let cardTextColor {
             await progress("Leyendo los colores del texto de la tarjeta…")
             do {
-                let original = try await readFile(device: device, path: "\(cardTarget)/pass.json")
+                let original = try await readFile(
+                    device: device,
+                    path: "\(cardTarget)/pass.json",
+                    progress: progress
+                )
                 let updated = try recoloredPassJSON(original, color: cardTextColor)
                 assets.append(("pass.json", updated))
                 await progress("Color de números preparado para \(Self.rgb(cardTextColor)); colores automáticos desactivados.")
@@ -287,15 +291,115 @@ struct WalletSkinService: Sendable {
         return object
     }
 
-    private func readFile(device: DeviceInfo, path: String) async throws -> Data {
-        let result = try await native(device: device, arguments: ["read-file", path])
+    private func readFile(
+        device: DeviceInfo,
+        path: String,
+        progress: @escaping @Sendable (String) async -> Void
+    ) async throws -> Data {
+        do {
+            let result = try await native(device: device, arguments: ["read-file", path])
+            return try decodeReadFile(result)
+        } catch {
+            await progress("AFC no expone directamente pass.json; usando el enlace temporal de AirTraffic…")
+        }
+
+        return try await readFileThroughStagedLink(
+            device: device,
+            path: path,
+            progress: progress
+        )
+    }
+
+    private func decodeReadFile(_ result: [String: Any]) throws -> Data {
         guard operationOK(result),
               let operation = result["operation"] as? [String: Any],
               let encoded = operation["dataBase64"] as? String,
               let data = Data(base64Encoded: encoded) else {
-            throw AirCardError.processFailed("No se pudo leer el pass.json de la tarjeta.")
+            let detail = (result["operation"] as? [String: Any])?["error"] as? String
+                ?? "respuesta AFC sin datos"
+            throw AirCardError.processFailed("No se pudo leer pass.json: \(detail)")
         }
         return data
+    }
+
+    private func readFileThroughStagedLink(
+        device: DeviceInfo,
+        path: String,
+        progress: @escaping @Sendable (String) async -> Void
+    ) async throws -> Data {
+        let token = randomToken()
+        let source = "airlift-src-\(token)"
+        let link = "airlift-link-\(token)"
+        let recovered = "airlift-recovered-\(token)"
+        let work = try NativeTools.temporaryDirectory(prefix: "aircard-read")
+        defer { try? FileManager.default.removeItem(at: work) }
+
+        let archiveURL = work.appendingPathComponent("payload.zip")
+        let booksURL = work.appendingPathComponent("Books.plist")
+        let snapshotURL = work.appendingPathComponent("books-snapshot", isDirectory: true)
+        try FileManager.default.createDirectory(at: snapshotURL, withIntermediateDirectories: true)
+
+        let directory = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        let archive = try zip.build(
+            target: directory,
+            files: [("read-probe", Data("aircard-read-probe".utf8))]
+        )
+        try archive.write(to: archiveURL, options: .atomic)
+        let identifiers = [
+            "../../\(source)/p0/p1/p2/link",
+            "../../\(source)/payload_0"
+        ]
+        let books = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "Books": identifiers.enumerated().map { index, identifier in
+                    ["Persistent ID": identifier, "Item ID": "\(index + 1)", "DSID": "1"]
+                }
+            ],
+            format: .binary,
+            options: 0
+        )
+        try books.write(to: booksURL, options: .atomic)
+
+        var staged = false
+        do {
+            await progress("Preparando lectura segura del pass.json…")
+            let snapshot = try await native(
+                device: device,
+                arguments: ["snapshot-books", snapshotURL.path]
+            )
+            guard operationOK(snapshot) else {
+                throw AirCardError.processFailed("No se pudo preparar la lectura: snapshot de Books inválido.")
+            }
+            let stage = try await native(
+                device: device,
+                arguments: ["stage", source, link, recovered, archiveURL.path, booksURL.path, snapshotURL.path]
+            )
+            guard operationOK(stage) else {
+                throw AirCardError.processFailed("No se pudo preparar la lectura: stage rechazado.")
+            }
+            staged = true
+
+            let stagedPath = "\(source)/p0/p1/p2/link/\(URL(fileURLWithPath: path).lastPathComponent)"
+            let result = try await native(device: device, arguments: ["read-file", stagedPath])
+            let data = try decodeReadFile(result)
+            let cleanup = try await native(
+                device: device,
+                arguments: ["finish-write", source, link, recovered, snapshotURL.path]
+            )
+            staged = false
+            guard operationOK(cleanup) else {
+                throw AirCardError.processFailed("La lectura terminó, pero no se pudo restaurar Books.")
+            }
+            return data
+        } catch {
+            if staged {
+                _ = try? await native(
+                    device: device,
+                    arguments: ["finish-write", source, link, recovered, snapshotURL.path]
+                )
+            }
+            throw error
+        }
     }
 
     private func recoloredPassJSON(_ data: Data, color: PasscodeTint) throws -> Data {
