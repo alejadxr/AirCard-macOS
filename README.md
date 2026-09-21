@@ -55,6 +55,7 @@ se intentan invalidar sus cachés.
 - Flash por batch y limpieza/restauración de Books.
 - Artwork de tarjetas Apple Pay mediante los nombres canónicos `cardBackgroundCombined`, `diffuse`, `background` y `strip` en 3x, 2x y PDF.
 - El color de los números de una tarjeta Apple Pay lo decide iOS/el emisor; Wallet no reconoce sufijos `--white` / `--black` para estos assets.
+- Icono de aplicación multicapa `AirCardIcon.icon`, compatible con Icon Composer/Xcode y Liquid Glass, más fallback vectorial `.icns` para el bundle Swift Package.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 - Generación de variantes de teclado `--white`, `--black`, `--white-bold` y `--black-bold`.
 

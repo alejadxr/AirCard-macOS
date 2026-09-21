@@ -1,0 +1,29 @@
+{
+  "color-space-for-untagged-svg-colors" : "display-p3",
+  "fill" : { "solid" : "display-p3:0.035,0.075,0.20,1.0" },
+  "supported-platforms" : { "squares" : { "platforms" : [ "macOS" ] } },
+  "groups" : [
+    {
+      "name" : "Frost Glass Capsule",
+      "lighting" : "combined",
+      "specular" : true,
+      "blur-material" : 0.45,
+      "translucency" : { "enabled" : true, "value" : 0.42 },
+      "shadow" : { "kind" : "neutral", "opacity" : 0.42 },
+      "layers" : [
+        { "name" : "01 Capsule", "image-name" : "01-capsule.svg" },
+        { "name" : "02 Cyan Refraction", "image-name" : "02-cyan-rim.svg", "opacity" : 0.88 }
+      ]
+    },
+    {
+      "name" : "AirCard Mark",
+      "lighting" : "individual",
+      "specular" : true,
+      "layers" : [
+        { "name" : "03 Card Body", "image-name" : "03-card-body.svg" },
+        { "name" : "04 Card Stripe", "image-name" : "04-card-stripe.svg" },
+        { "name" : "05 Card Slot", "image-name" : "05-card-slot.svg" }
+      ]
+    }
+  ]
+}
