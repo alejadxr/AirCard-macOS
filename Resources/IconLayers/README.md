@@ -10,6 +10,6 @@ simple and solid so Icon Composer can apply Liquid Glass dynamically:
 4. blue card stripe;
 5. blue card slot.
 
-The Swift Package build also renders a deterministic vector fallback and packs
-it as `AirCardMac.icns` for older macOS and direct bundle builds. No raster
-concept art is used by the app.
+Xcode 26.2 compiles this source into `Resources/Assets.car` and
+`Resources/AirCardIcon.icns`. The app bundle uses those compiled artifacts;
+there is no hand-rendered concept PNG in the icon pipeline.

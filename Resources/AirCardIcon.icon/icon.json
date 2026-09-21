@@ -1,7 +1,11 @@
 {
   "color-space-for-untagged-svg-colors" : "display-p3",
-  "fill" : { "solid" : "display-p3:0.035,0.075,0.20,1.0" },
-  "supported-platforms" : { "squares" : { "platforms" : [ "macOS" ] } },
+  "fill-specializations" : [
+    { "value" : { "solid" : "display-p3:0.03500,0.07500,0.20000,1.00000" } },
+    { "appearance" : "dark", "value" : { "solid" : "display-p3:0.01500,0.02500,0.08000,1.00000" } },
+    { "appearance" : "tinted", "value" : "system-dark" }
+  ],
+  "supported-platforms" : { "squares" : "shared" },
   "groups" : [
     {
       "name" : "Frost Glass Capsule",

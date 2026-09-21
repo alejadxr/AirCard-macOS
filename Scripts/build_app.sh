@@ -20,21 +20,8 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/bin/device_helper" "$APP/Contents/Resources/bin/device_helper"
 cp "$ROOT/Resources/bin/airtraffic_host" "$APP/Contents/Resources/bin/airtraffic_host"
 chmod +x "$APP/Contents/MacOS/AirCardMac" "$APP/Contents/Resources/bin/"*
-
-ICONSET="$ROOT/Resources/AppIcon.iconset"
-ICON="$APP/Contents/Resources/AirCardMac.icns"
-mkdir -p "$ICONSET"
-swift "$ROOT/Scripts/render_icon_fallback.swift" "$ICONSET"
-sips -z 512 512 "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_512x512.png" >/dev/null
-sips -z 256 256 "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
-sips -z 256 256 "$ICONSET/icon_256x256@2x.png" --out "$ICONSET/icon_256x256.png" >/dev/null
-sips -z 128 128 "$ICONSET/icon_256x256@2x.png" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
-sips -z 128 128 "$ICONSET/icon_128x128@2x.png" --out "$ICONSET/icon_128x128.png" >/dev/null
-sips -z 64 64 "$ICONSET/icon_128x128@2x.png" --out "$ICONSET/icon_32x32@2x.png" >/dev/null
-sips -z 32 32 "$ICONSET/icon_32x32@2x.png" --out "$ICONSET/icon_32x32.png" >/dev/null
-sips -z 32 32 "$ICONSET/icon_32x32@2x.png" --out "$ICONSET/icon_16x16@2x.png" >/dev/null
-sips -z 16 16 "$ICONSET/icon_16x16@2x.png" --out "$ICONSET/icon_16x16.png" >/dev/null
-iconutil --convert icns "$ICONSET" --output "$ICON"
+cp "$ROOT/Resources/Assets.car" "$APP/Contents/Resources/Assets.car"
+cp "$ROOT/Resources/AirCardIcon.icns" "$APP/Contents/Resources/AirCardIcon.icns"
 cp -R "$ROOT/Resources/AirCardIcon.icon" "$APP/Contents/Resources/AirCardIcon.icon"
 
 # Finder/FileProvider can attach metadata to generated bundles in this
