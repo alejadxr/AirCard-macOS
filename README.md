@@ -51,7 +51,7 @@ se intentan invalidar sus cachés.
 
 - Port funcional inicial de Wallet card skin.
 - Detección nativa de iPhones emparejados.
-- Preparación centralizada a 1536×969 PNG y PDF.
+- Preparación a 1536×969 PNG/PDF conservando los bordes de la imagen.
 - Flash por batch y limpieza/restauración de Books.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 

@@ -15,30 +15,22 @@ enum ImageProcessor {
 
         let sourceWidth = image.width
         let sourceHeight = image.height
-        let sourceRatio = CGFloat(sourceWidth) / CGFloat(sourceHeight)
-        let targetRatio = CGFloat(targetWidth) / CGFloat(targetHeight)
+        let scale = min(
+            CGFloat(targetWidth) / CGFloat(sourceWidth),
+            CGFloat(targetHeight) / CGFloat(sourceHeight)
+        )
+        let fittedSize = CGSize(
+            width: CGFloat(sourceWidth) * scale,
+            height: CGFloat(sourceHeight) * scale
+        )
+        let fittedRect = CGRect(
+            x: (CGFloat(targetWidth) - fittedSize.width) / 2,
+            y: (CGFloat(targetHeight) - fittedSize.height) / 2,
+            width: fittedSize.width,
+            height: fittedSize.height
+        )
 
-        let crop: CGRect
-        if sourceRatio > targetRatio {
-            let cropWidth = CGFloat(sourceHeight) * targetRatio
-            crop = CGRect(
-                x: (CGFloat(sourceWidth) - cropWidth) / 2,
-                y: 0,
-                width: cropWidth,
-                height: CGFloat(sourceHeight)
-            )
-        } else {
-            let cropHeight = CGFloat(sourceWidth) / targetRatio
-            crop = CGRect(
-                x: 0,
-                y: (CGFloat(sourceHeight) - cropHeight) / 2,
-                width: CGFloat(sourceWidth),
-                height: cropHeight
-            )
-        }
-
-        guard let cropped = image.cropping(to: crop.integral),
-              let context = CGContext(
+        guard let context = CGContext(
                 data: nil,
                 width: targetWidth,
                 height: targetHeight,
@@ -47,11 +39,15 @@ enum ImageProcessor {
                 space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
               ) else {
-            throw AirCardError.processFailed("No pude preparar el recorte de la imagen.")
+            throw AirCardError.processFailed("No pude preparar el lienzo de la imagen.")
         }
 
         context.interpolationQuality = .high
-        context.draw(cropped, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        // First cover the canvas so there are no empty bands. The full-canvas
+        // layer is only a backdrop; the fitted layer below keeps every source
+        // pixel, including borders, at its original proportions.
+        context.draw(image, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        context.draw(image, in: fittedRect)
         guard let resized = context.makeImage() else {
             throw AirCardError.processFailed("No pude redimensionar la imagen.")
         }

@@ -72,7 +72,7 @@ final class AppModel: ObservableObject {
                 self?.artwork = prepared
                 self?.artworkPreview = NSImage(data: prepared.png)
                 self?.imageName = url.lastPathComponent
-                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969."
+                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969, conservando bordes."
                 self?.log("Artwork preparado: \(url.lastPathComponent)")
             } catch {
                 self?.status = error.localizedDescription

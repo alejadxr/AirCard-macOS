@@ -71,7 +71,7 @@ struct ContentView: View {
                         Text(model.imageName.isEmpty ? "PNG, JPG o WebP" : model.imageName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("Se recorta al centro y se genera el PNG/PDF que espera Wallet.")
+                        Text("Se ajusta al lienzo conservando los bordes y se genera el PNG/PDF que espera Wallet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("Antes de aplicar: iPhone desbloqueado y Apple Books abierto al menos una vez.")

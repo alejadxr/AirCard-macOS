@@ -155,9 +155,24 @@ struct PasscodeThemeService: Sendable {
         context.clear(rect)
         context.interpolationQuality = .high
         context.draw(image, in: rect)
-        context.setBlendMode(.sourceIn)
-        context.setFillColor(red: tint.red, green: tint.green, blue: tint.blue, alpha: 1)
-        context.fill(rect)
+
+        if containsTransparency(context: context, width: image.width, height: image.height) {
+            // Transparent keypad assets are already masks for the glyph/artwork.
+            // Tint the visible pixels while preserving their alpha edges.
+            context.setBlendMode(.sourceIn)
+            context.setFillColor(red: tint.red, green: tint.green, blue: tint.blue, alpha: 1)
+            context.fill(rect)
+        } else {
+            // Some .passthm packages flatten the key onto an opaque background.
+            // In those assets, recolor only the bright pixels (the --white
+            // number/subtext) and leave the darker button artwork intact.
+            recolorBrightGlyphs(
+                context: context,
+                width: image.width,
+                height: image.height,
+                tint: tint
+            )
+        }
 
         guard let output = context.makeImage() else {
             throw AirCardError.processFailed("No pude generar la imagen recoloreada.")
@@ -176,6 +191,46 @@ struct PasscodeThemeService: Sendable {
             throw AirCardError.processFailed("No pude finalizar el PNG recoloreado.")
         }
         return destinationData as Data
+    }
+
+    private static func containsTransparency(context: CGContext, width: Int, height: Int) -> Bool {
+        guard let data = context.data else { return true }
+        let pixels = data.assumingMemoryBound(to: UInt8.self)
+        for y in 0..<height {
+            for x in 0..<width {
+                if pixels[(y * context.bytesPerRow) + x * 4 + 3] < 250 {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func recolorBrightGlyphs(
+        context: CGContext,
+        width: Int,
+        height: Int,
+        tint: PasscodeTint
+    ) {
+        guard let data = context.data else { return }
+        let pixels = data.assumingMemoryBound(to: UInt8.self)
+        let target = (red: tint.red * 255, green: tint.green * 255, blue: tint.blue * 255)
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = y * context.bytesPerRow + x * 4
+                let red = Double(pixels[offset])
+                let green = Double(pixels[offset + 1])
+                let blue = Double(pixels[offset + 2])
+                let brightness = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
+                let mask = min(1, max(0, (brightness - 0.55) / 0.35))
+                guard mask > 0 else { continue }
+
+                pixels[offset] = UInt8((red * (1 - mask) + target.red * mask).rounded())
+                pixels[offset + 1] = UInt8((green * (1 - mask) + target.green * mask).rounded())
+                pixels[offset + 2] = UInt8((blue * (1 - mask) + target.blue * mask).rounded())
+            }
+        }
     }
 
     private func normalizedLeafName(_ name: String) -> String {
