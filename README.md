@@ -79,4 +79,7 @@ individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.
 
 Para cambiar los números y etiquetas de una tarjeta de Wallet no necesitas un
 `.passthm`: selecciona el color en la sección de Artwork y pulsa “Aplicar skin”.
-La app conserva el `pass.json` original y solo actualiza sus colores de texto.
+La app conserva el `pass.json` original, actualiza `foregroundColor` y
+`labelColor`, y desactiva `useAutomaticColors` cuando está presente para que
+Wallet no vuelva a imponer el verde calculado desde el artwork. Si no puede
+leer o actualizar el `pass.json`, el flash se detiene y lo informa en los logs.

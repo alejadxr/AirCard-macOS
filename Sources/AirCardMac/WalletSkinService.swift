@@ -79,9 +79,9 @@ struct WalletSkinService: Sendable {
                 let original = try await readFile(device: device, path: "\(cardTarget)/pass.json")
                 let updated = try recoloredPassJSON(original, color: cardTextColor)
                 assets.append(("pass.json", updated))
-                await progress("Color de números preparado para (Self.rgb(cardTextColor)).")
+                await progress("Color de números preparado para \(Self.rgb(cardTextColor)); colores automáticos desactivados.")
             } catch {
-                await progress("No pude leer pass.json; se aplicará solo el artwork de Wallet.")
+                throw AirCardError.processFailed("No se pudo preparar el color de los números: \(error.localizedDescription)")
             }
         }
 
@@ -305,6 +305,9 @@ struct WalletSkinService: Sendable {
         let rgb = Self.rgb(color)
         pass["foregroundColor"] = rgb
         pass["labelColor"] = rgb
+        // Wallet can otherwise recalculate these colors from the artwork and
+        // ignore the explicit foregroundColor/labelColor values.
+        pass["useAutomaticColors"] = false
         return try JSONSerialization.data(withJSONObject: pass, options: [.sortedKeys])
     }
 
