@@ -10,7 +10,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text("Wallet card skin · Swift Concurrency · v0.1.5")
+                    Text("Wallet card skin · Swift Concurrency · v0.1.6")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -75,9 +75,10 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ColorPicker("Color de números y etiquetas", selection: $model.cardTextColor, supportsOpacity: false)
-                        Text("No necesitas un .passthm: se actualizan foregroundColor y labelColor del pass.")
+                            .disabled(true)
+                        Text("No disponible para tarjetas Apple Pay: iOS decide el color de los números. No necesitas un .passthm para el artwork.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.orange)
                         Text("Antes de aplicar: iPhone desbloqueado y Apple Books abierto al menos una vez.")
                             .font(.caption)
                             .foregroundStyle(.orange)

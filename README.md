@@ -53,7 +53,7 @@ se intentan invalidar sus cachés.
 - Detección nativa de iPhones emparejados.
 - Preparación a 1536×969 PNG/PDF conservando los bordes de la imagen.
 - Flash por batch y limpieza/restauración de Books.
-- Cambio de color del texto de la tarjeta mediante `foregroundColor` y `labelColor` de `pass.json`.
+- Artwork de tarjetas Apple Pay mediante `cardBackgroundCombined`; el color de los números lo decide iOS.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 
 ## Sobre el color de los números
@@ -77,11 +77,7 @@ y pulsa “Aplicar color al teclado”. El port conserva los nombres y variantes
 paquete, convierte JPG/JPEG a PNG y hace la escritura por lotes con fallback
 individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.
 
-Para cambiar los números y etiquetas de una tarjeta de Wallet no necesitas un
-`.passthm`: selecciona el color en la sección de Artwork y pulsa “Aplicar skin”.
-La app conserva el `pass.json` original, actualiza `foregroundColor` y
-`labelColor`, y desactiva `useAutomaticColors` cuando está presente para que
-Wallet no vuelva a imponer el verde calculado desde el artwork. Como AFC no
-expone directamente la carpeta privada de Wallet, la lectura usa un enlace
-temporal de AirTraffic y restaura Books al terminar. Si no puede leer o
-actualizar el `pass.json`, el flash se detiene y lo informa en los logs.
+Para tarjetas Apple Pay, iOS dibuja los números y decide su color internamente;
+el port original tampoco modifica `pass.json`, solo reemplaza el artwork y
+limpia las cachés de Wallet. Por eso el selector de color aparece deshabilitado
+para no prometer un cambio que este tipo de tarjeta no permite por AFC.
