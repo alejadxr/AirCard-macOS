@@ -54,6 +54,7 @@ se intentan invalidar sus cachés.
 - Preparación a 1536×969 PNG/PDF conservando los bordes de la imagen.
 - Flash por batch y limpieza/restauración de Books.
 - Artwork de tarjetas Apple Pay mediante `cardBackgroundCombined`; el color de los números lo decide iOS.
+- Selector experimental `--white` / `--black` en Artwork, que escribe nombres de assets adicionales sin quitar los nombres canónicos.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 - Generación de variantes de teclado `--white`, `--black`, `--white-bold` y `--black-bold`.
 
@@ -82,7 +83,8 @@ Además de conservar el nombre original, la variante elegida en la interfaz se
 escribe como `--white` o `--black`; si la imagen es `-bold`, se usa
 `--white-bold` o `--black-bold` respectivamente.
 
-Para tarjetas Apple Pay, iOS dibuja los números y decide su color internamente;
-el port original tampoco modifica `pass.json`, solo reemplaza el artwork y
-limpia las cachés de Wallet. Por eso el selector de color aparece deshabilitado
-para no prometer un cambio que este tipo de tarjeta no permite por AFC.
+Para tarjetas Apple Pay, iOS dibuja los números y normalmente decide su color
+internamente; el port original tampoco modifica `pass.json`, solo reemplaza el
+artwork y limpia las cachés de Wallet. El selector experimental escribe además
+variantes con sufijo `--white` o `--black` para comprobar si una build concreta
+de iOS las reconoce, pero puede ignorarlas.

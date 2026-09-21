@@ -58,7 +58,7 @@ struct WalletSkinService: Sendable {
         device: DeviceInfo,
         cardHash rawHash: String,
         artwork: PreparedArtwork,
-        cardTextColor: PasscodeTint? = nil,
+        cardVariant: PasscodeVariant = .white,
         progress: @escaping @Sendable (String) async -> Void
     ) async throws -> FlashResult {
         guard let cardHash = validateCardHash(rawHash) else {
@@ -66,16 +66,14 @@ struct WalletSkinService: Sendable {
         }
         try Task.checkCancellation()
 
-        let assets: [(String, Data)] = [
+        var assets: [(String, Data)] = [
             ("cardBackgroundCombined@3x.png", artwork.png),
             ("cardBackgroundCombined@2x.png", artwork.png),
             ("cardBackgroundCombined.pdf", artwork.pdf)
         ]
         let cardTarget = "/var/mobile/Library/Passes/Cards/\(cardHash).pkpass"
-
-        if cardTextColor != nil {
-            await progress("Aviso: esta tarjeta Apple Pay no expone pass.json por AFC; iOS controla el color de sus números. Se aplicará el artwork.")
-        }
+        assets.append(contentsOf: experimentalVariantAssets(artwork: artwork, variant: cardVariant))
+        await progress("Probando variante experimental --\(cardVariant.rawValue) en los assets de Wallet…")
 
         let cacheTargets = [
             "/var/mobile/Library/Passes/Cards/\(cardHash).cache",
@@ -256,6 +254,23 @@ struct WalletSkinService: Sendable {
         )
         await progress("Cleanup: \(diagnostic(finish))")
         return atc["ok"] as? Bool == true && operationOK(finish)
+    }
+
+    private func experimentalVariantAssets(
+        artwork: PreparedArtwork,
+        variant: PasscodeVariant
+    ) -> [(String, Data)] {
+        let suffix = "--\(variant.rawValue)"
+        // These names are deliberately additive: the three canonical Wallet
+        // assets remain present, while these candidates let us test whether a
+        // particular iOS build recognizes a color-suffixed card asset.
+        return [
+            ("cardBackgroundCombined@3x\(suffix).png", artwork.png),
+            ("cardBackgroundCombined@2x\(suffix).png", artwork.png),
+            ("cardBackgroundCombined\(suffix)@3x.png", artwork.png),
+            ("cardBackgroundCombined\(suffix)@2x.png", artwork.png),
+            ("cardBackgroundCombined\(suffix).pdf", artwork.pdf)
+        ]
     }
 
     private func native(device: DeviceInfo, arguments: [String]) async throws -> [String: Any] {

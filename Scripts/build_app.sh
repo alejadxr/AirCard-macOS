@@ -26,6 +26,7 @@ chmod +x "$APP/Contents/MacOS/AirCardMac" "$APP/Contents/Resources/bin/"*
 # signing; do not remove anything from the user's wider filesystem.
 xattr -cr "$APP" 2>/dev/null || true
 for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P; do
+  xattr -d "$attribute" "$APP" 2>/dev/null || true
   xattr -dr "$attribute" "$APP" 2>/dev/null || true
 done
 codesign --force --deep --sign - "$APP"

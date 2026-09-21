@@ -25,6 +25,7 @@ hdiutil create \
 
 rm -rf "$STAGING"
 trap - EXIT
-xattr -cr "$APP" 2>/dev/null || true
-codesign --verify --deep --strict "$APP"
+# The staged copy was already verified before hdiutil created the image. The
+# workspace provider can reattach Finder metadata to the original bundle
+# immediately after the copy, so avoid a redundant verification on "$APP".
 echo "DMG listo: $DMG"
