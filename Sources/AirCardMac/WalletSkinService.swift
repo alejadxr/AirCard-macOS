@@ -134,6 +134,30 @@ struct WalletSkinService: Sendable {
         return FlashResult(cardHash: cardHash, artworkFiles: assets.count, cacheFiles: cacheWrites)
     }
 
+    func writeFiles(
+        device: DeviceInfo,
+        target: String,
+        files: [(String, Data)],
+        progress: @escaping @Sendable (String) async -> Void
+    ) async throws -> Bool {
+        guard !files.isEmpty else { return true }
+        if try await writeBatch(device: device, target: target, files: files, progress: progress) {
+            return true
+        }
+
+        await progress("El lote falló; escribiendo las teclas individualmente…")
+        for file in files {
+            try Task.checkCancellation()
+            guard try await writeBatch(
+                device: device,
+                target: target,
+                files: [file],
+                progress: progress
+            ) else { return false }
+        }
+        return true
+    }
+
     private func writeBatch(
         device: DeviceInfo,
         target: String,

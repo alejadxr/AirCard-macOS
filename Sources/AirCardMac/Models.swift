@@ -21,6 +21,43 @@ struct PreparedArtwork: Sendable {
     let sourceHeight: Int
 }
 
+struct PasscodeTint: Sendable, Equatable {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    static let white = PasscodeTint(red: 1, green: 1, blue: 1)
+}
+
+struct PasscodeAsset: Sendable {
+    let name: String
+    let data: Data
+    let isImage: Bool
+}
+
+struct PasscodeTheme: Sendable {
+    let name: String
+    let detectedVersion: String
+    let assetsByVersion: [String: [PasscodeAsset]]
+    let unversionedAssets: [PasscodeAsset]
+
+    func assets(for version: String) -> [PasscodeAsset] {
+        assetsByVersion[version] ?? unversionedAssets
+    }
+
+    var previewAsset: PasscodeAsset? {
+        let assets = assets(for: detectedVersion)
+        return assets.first(where: { $0.isImage && $0.name.range(of: #"[0-9]"#, options: .regularExpression) != nil })
+            ?? assets.first(where: \ .isImage)
+    }
+}
+
+struct PasscodeFlashResult: Sendable {
+    let themeName: String
+    let targetVersion: String
+    let assetCount: Int
+}
+
 struct FlashResult: Sendable {
     let cardHash: String
     let artworkFiles: Int

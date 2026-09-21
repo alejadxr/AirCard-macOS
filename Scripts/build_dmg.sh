@@ -5,12 +5,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 "$ROOT/Scripts/build_app.sh"
 
 APP="$ROOT/build/AirCardMac.app"
-STAGING="$ROOT/build/dmg-staging"
 DMG="$ROOT/build/AirCardMac.dmg"
+STAGING="$(mktemp -d -t aircard-dmg.XXXXXX)"
+trap 'rm -rf "$STAGING"' EXIT
 
-rm -rf "$STAGING"
-mkdir -p "$STAGING"
-cp -R "$APP" "$STAGING/AirCardMac.app"
+ditto --norsrc --noextattr --noqtn "$APP" "$STAGING/AirCardMac.app"
 xattr -cr "$STAGING/AirCardMac.app" 2>/dev/null || true
 for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P; do
   xattr -dr "$attribute" "$STAGING/AirCardMac.app" 2>/dev/null || true
@@ -25,6 +24,7 @@ hdiutil create \
   "$DMG"
 
 rm -rf "$STAGING"
+trap - EXIT
 xattr -cr "$APP" 2>/dev/null || true
 codesign --verify --deep --strict "$APP"
 echo "DMG listo: $DMG"

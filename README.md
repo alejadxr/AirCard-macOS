@@ -53,7 +53,7 @@ se intentan invalidar sus cachés.
 - Detección nativa de iPhones emparejados.
 - Preparación centralizada a 1536×969 PNG y PDF.
 - Flash por batch y limpieza/restauración de Books.
-- Passcode themes quedan para la siguiente iteración.
+- Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 
 ## Sobre el color de los números
 
@@ -69,6 +69,9 @@ en-2-A B C--white-bold.png
 Por tanto, para cambiar el color hay que recolorear o regenerar los PNG de las
 teclas y después escribir las variantes correspondientes en
 `/var/mobile/Library/Caches/TelephonyUI-10` (o `-9`/`-8`, según iOS). La variante
-`-bold` es la que usa iOS cuando está activo “Texto en negrita”. El port macOS
-actual implementa únicamente la skin de Wallet; el editor y el flasher de
-`.passthm` todavía no están incluidos.
+`-bold` es la que usa iOS cuando está activo “Texto en negrita”.
+
+En la app: elige un `.passthm`, selecciona el color, verifica la previsualización
+y pulsa “Aplicar color al teclado”. El port conserva los nombres y variantes del
+paquete, convierte JPG/JPEG a PNG y hace la escritura por lotes con fallback
+individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.

@@ -93,6 +93,61 @@ struct ContentView: View {
                     .lineLimit(2)
             }
 
+            GroupBox("4. Color de los números") {
+                HStack(spacing: 16) {
+                    Group {
+                        if let image = model.passcodePreview {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 150, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(.quaternary, lineWidth: 1)
+                                }
+                        } else {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.quaternary)
+                                .frame(width: 150, height: 100)
+                                .overlay { Text("Sin tema").foregroundStyle(.secondary) }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Button("Elegir .passthm…") { model.choosePasscodeTheme() }
+                            Text(model.passcodeThemeName.isEmpty ? "Tema de teclado" : model.passcodeThemeName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        HStack(spacing: 14) {
+                            ColorPicker("Color", selection: $model.passcodeColor, supportsOpacity: false)
+                                .frame(width: 170)
+                                .onChange(of: model.passcodeColor) { _, _ in
+                                    model.recolorPasscodePreview()
+                                }
+                            Picker("Caché", selection: $model.passcodeTargetVersion) {
+                                Text("TelephonyUI-10").tag("TelephonyUI-10")
+                                Text("TelephonyUI-9").tag("TelephonyUI-9")
+                                Text("TelephonyUI-8").tag("TelephonyUI-8")
+                            }
+                            .frame(width: 170)
+                            .onChange(of: model.passcodeTargetVersion) { _, _ in
+                                model.recolorPasscodePreview()
+                            }
+                        }
+                        Text("Recolorea los PNG del tema y los escribe en la caché del teclado de iOS.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Aplicar color al teclado") { model.flashPasscodeTheme() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.isBusy || model.devices.isEmpty || model.passcodeTheme == nil)
+                    }
+                }
+            }
+
             DisclosureGroup("Registro") {
                 ScrollView {
                     Text(model.logs.joined(separator: "\n"))

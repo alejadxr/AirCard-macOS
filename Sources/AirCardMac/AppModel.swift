@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -10,6 +11,11 @@ final class AppModel: ObservableObject {
     @Published var artwork: PreparedArtwork?
     @Published var artworkPreview: NSImage?
     @Published var imageName = ""
+    @Published var passcodeTheme: PasscodeTheme?
+    @Published var passcodePreview: NSImage?
+    @Published var passcodeThemeName = ""
+    @Published var passcodeColor = Color.white
+    @Published var passcodeTargetVersion = "TelephonyUI-10"
     @Published var status = "Listo. Conecta y desbloquea el iPhone."
     @Published var logs: [String] = []
     @Published var isBusy = false
@@ -18,6 +24,7 @@ final class AppModel: ObservableObject {
     private let service = WalletSkinService()
     private var currentTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
+    private var passcodePreviewTask: Task<Void, Never>?
 
     init() {
         refreshDevices()
@@ -73,6 +80,126 @@ final class AppModel: ObservableObject {
             }
             self?.isBusy = false
         }
+    }
+
+    func choosePasscodeTheme() {
+        let panel = NSOpenPanel()
+        let passcodeType = UTType(filenameExtension: "passthm") ?? .zip
+        panel.allowedContentTypes = [passcodeType, .zip]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isBusy = true
+        status = "Abriendo el tema del teclado…"
+        currentTask?.cancel()
+        let tint = currentPasscodeTint()
+        currentTask = Task { [weak self] in
+            do {
+                let loaded = try await Task.detached(priority: .userInitiated) {
+                    try await PasscodeThemeService().load(url: url)
+                }.value
+                let previewData = try await Task.detached(priority: .userInitiated) {
+                    try PasscodeThemeService().preview(
+                        theme: loaded,
+                        color: tint,
+                        targetVersion: loaded.detectedVersion
+                    )
+                }.value
+                guard !Task.isCancelled else { return }
+                self?.passcodeTheme = loaded
+                self?.passcodeThemeName = loaded.name
+                self?.passcodeTargetVersion = loaded.detectedVersion
+                self?.passcodePreview = NSImage(data: previewData)
+                self?.status = "Tema listo: \(loaded.name). Elige un color y aplícalo."
+                self?.log("Tema de teclado preparado: \(loaded.name) [\(loaded.detectedVersion)]")
+            } catch is CancellationError {
+                self?.status = "Operación cancelada."
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("No pude abrir el tema del teclado: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func recolorPasscodePreview() {
+        guard let theme = passcodeTheme else { return }
+        passcodePreviewTask?.cancel()
+        let tint = currentPasscodeTint()
+        let target = passcodeTargetVersion
+        passcodePreviewTask = Task { [weak self] in
+            do {
+                let data = try await Task.detached(priority: .userInitiated) {
+                    try PasscodeThemeService().preview(theme: theme, color: tint, targetVersion: target)
+                }.value
+                guard !Task.isCancelled else { return }
+                self?.passcodePreview = NSImage(data: data)
+            } catch {
+                self?.log("No pude actualizar la previsualización: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func flashPasscodeTheme() {
+        guard let device = devices.first(where: { $0.id == selectedDeviceID }) else {
+            status = "Selecciona un iPhone conectado."
+            return
+        }
+        guard let theme = passcodeTheme else {
+            status = "Selecciona un tema .passthm primero."
+            return
+        }
+
+        currentTask?.cancel()
+        isBusy = true
+        status = "Escribiendo color del teclado en \(device.name)…"
+        let scanToStop = scanTask
+        if let scanToStop {
+            scanToStop.cancel()
+            isScanning = false
+            log("Escaneo detenido; esperando el cierre del helper nativo…")
+        }
+        let tint = currentPasscodeTint()
+        let target = passcodeTargetVersion
+        currentTask = Task { [weak self] in
+            do {
+                if let scanToStop {
+                    await scanToStop.value
+                    try Task.checkCancellation()
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                self?.log("Inicio de color de teclado para \(device.name).")
+                let result = try await PasscodeThemeService().flash(
+                    theme: theme,
+                    device: device,
+                    color: tint,
+                    targetVersion: target
+                ) { message in
+                    await MainActor.run {
+                        self?.status = message
+                        self?.log(message)
+                    }
+                }
+                guard !Task.isCancelled else { return }
+                self?.status = "Color aplicado. Bloquea el iPhone para ver el teclado."
+                self?.log("Completado: \(result.assetCount) assets en \(result.targetVersion).")
+            } catch is CancellationError {
+                self?.status = "Operación cancelada."
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("Color de teclado fallido: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func currentPasscodeTint() -> PasscodeTint {
+        let color = NSColor(passcodeColor).usingColorSpace(.deviceRGB) ?? .white
+        return PasscodeTint(
+            red: Double(color.redComponent),
+            green: Double(color.greenComponent),
+            blue: Double(color.blueComponent)
+        )
     }
 
     func flashSkin() {
@@ -173,6 +300,7 @@ final class AppModel: ObservableObject {
     func cancel() {
         currentTask?.cancel()
         scanTask?.cancel()
+        passcodePreviewTask?.cancel()
         isScanning = false
         isBusy = false
         status = "Operación cancelada."
