@@ -58,6 +58,7 @@ struct WalletSkinService: Sendable {
         device: DeviceInfo,
         cardHash rawHash: String,
         artwork: PreparedArtwork,
+        cardTextColor: PasscodeTint? = nil,
         progress: @escaping @Sendable (String) async -> Void
     ) async throws -> FlashResult {
         guard let cardHash = validateCardHash(rawHash) else {
@@ -65,12 +66,25 @@ struct WalletSkinService: Sendable {
         }
         try Task.checkCancellation()
 
-        let assets: [(String, Data)] = [
+        var assets: [(String, Data)] = [
             ("cardBackgroundCombined@3x.png", artwork.png),
             ("cardBackgroundCombined@2x.png", artwork.png),
             ("cardBackgroundCombined.pdf", artwork.pdf)
         ]
         let cardTarget = "/var/mobile/Library/Passes/Cards/\(cardHash).pkpass"
+
+        if let cardTextColor {
+            await progress("Leyendo los colores del texto de la tarjeta…")
+            do {
+                let original = try await readFile(device: device, path: "\(cardTarget)/pass.json")
+                let updated = try recoloredPassJSON(original, color: cardTextColor)
+                assets.append(("pass.json", updated))
+                await progress("Color de números preparado para (Self.rgb(cardTextColor)).")
+            } catch {
+                await progress("No pude leer pass.json; se aplicará solo el artwork de Wallet.")
+            }
+        }
+
         let cacheTargets = [
             "/var/mobile/Library/Passes/Cards/\(cardHash).cache",
             "/var/mobile/Library/Passes/Cards/\(cardHash).pkcache"
@@ -271,6 +285,32 @@ struct WalletSkinService: Sendable {
             )
         }
         return object
+    }
+
+    private func readFile(device: DeviceInfo, path: String) async throws -> Data {
+        let result = try await native(device: device, arguments: ["read-file", path])
+        guard operationOK(result),
+              let operation = result["operation"] as? [String: Any],
+              let encoded = operation["dataBase64"] as? String,
+              let data = Data(base64Encoded: encoded) else {
+            throw AirCardError.processFailed("No se pudo leer el pass.json de la tarjeta.")
+        }
+        return data
+    }
+
+    private func recoloredPassJSON(_ data: Data, color: PasscodeTint) throws -> Data {
+        guard var pass = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AirCardError.processFailed("El pass.json no tiene un formato válido.")
+        }
+        let rgb = Self.rgb(color)
+        pass["foregroundColor"] = rgb
+        pass["labelColor"] = rgb
+        return try JSONSerialization.data(withJSONObject: pass, options: [.sortedKeys])
+    }
+
+    private static func rgb(_ color: PasscodeTint) -> String {
+        let values = [color.red, color.green, color.blue].map { Int(($0 * 255).rounded()) }
+        return "rgb(\(values[0]), \(values[1]), \(values[2]))"
     }
 
     private func nativeAirTraffic(arguments: [String]) async throws -> [String: Any] {

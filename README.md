@@ -53,6 +53,7 @@ se intentan invalidar sus cachés.
 - Detección nativa de iPhones emparejados.
 - Preparación a 1536×969 PNG/PDF conservando los bordes de la imagen.
 - Flash por batch y limpieza/restauración de Books.
+- Cambio de color del texto de la tarjeta mediante `foregroundColor` y `labelColor` de `pass.json`.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 
 ## Sobre el color de los números
@@ -75,3 +76,7 @@ En la app: elige un `.passthm`, selecciona el color, verifica la previsualizaci�
 y pulsa “Aplicar color al teclado”. El port conserva los nombres y variantes del
 paquete, convierte JPG/JPEG a PNG y hace la escritura por lotes con fallback
 individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.
+
+Para cambiar los números y etiquetas de una tarjeta de Wallet no necesitas un
+`.passthm`: selecciona el color en la sección de Artwork y pulsa “Aplicar skin”.
+La app conserva el `pass.json` original y solo actualiza sus colores de texto.

@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
     @Published var passcodeThemeName = ""
     @Published var passcodeColor = Color.white
     @Published var passcodeTargetVersion = "TelephonyUI-10"
+    @Published var cardTextColor = Color.white
     @Published var status = "Listo. Conecta y desbloquea el iPhone."
     @Published var logs: [String] = []
     @Published var isBusy = false
@@ -202,6 +203,15 @@ final class AppModel: ObservableObject {
         )
     }
 
+    func currentCardTextColor() -> PasscodeTint {
+        let color = NSColor(cardTextColor).usingColorSpace(.deviceRGB) ?? .white
+        return PasscodeTint(
+            red: Double(color.redComponent),
+            green: Double(color.greenComponent),
+            blue: Double(color.blueComponent)
+        )
+    }
+
     func flashSkin() {
         guard let device = devices.first(where: { $0.id == selectedDeviceID }) else {
             status = "Selecciona un iPhone conectado."
@@ -226,6 +236,7 @@ final class AppModel: ObservableObject {
             log("Escaneo detenido; esperando el cierre del helper nativo…")
         }
         let rawCardHash = cardHash
+        let textColor = currentCardTextColor()
         currentTask = Task { [weak self] in
             do {
                 if let scanToStop {
@@ -237,7 +248,8 @@ final class AppModel: ObservableObject {
                 let result = try await WalletSkinService().flash(
                     device: device,
                     cardHash: rawCardHash,
-                    artwork: artwork
+                    artwork: artwork,
+                    cardTextColor: textColor
                 ) { message in
                     await MainActor.run {
                         self?.status = message

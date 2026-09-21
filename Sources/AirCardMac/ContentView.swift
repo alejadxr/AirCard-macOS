@@ -74,6 +74,10 @@ struct ContentView: View {
                         Text("Se ajusta al lienzo conservando los bordes y se genera el PNG/PDF que espera Wallet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        ColorPicker("Color de números y etiquetas", selection: $model.cardTextColor, supportsOpacity: false)
+                        Text("No necesitas un .passthm: se actualizan foregroundColor y labelColor del pass.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         Text("Antes de aplicar: iPhone desbloqueado y Apple Books abierto al menos una vez.")
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -93,7 +97,7 @@ struct ContentView: View {
                     .lineLimit(2)
             }
 
-            GroupBox("4. Color de los números") {
+            GroupBox("5. Teclado de código (opcional)") {
                 HStack(spacing: 16) {
                     Group {
                         if let image = model.passcodePreview {
@@ -138,7 +142,7 @@ struct ContentView: View {
                                 model.recolorPasscodePreview()
                             }
                         }
-                        Text("Recolorea los PNG del tema y los escribe en la caché del teclado de iOS.")
+                        Text("Solo necesitas esta sección si también quieres cambiar el teclado de código; para los números de Wallet usa el selector de arriba.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Aplicar color al teclado") { model.flashPasscodeTheme() }

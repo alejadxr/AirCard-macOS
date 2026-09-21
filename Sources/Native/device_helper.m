@@ -419,6 +419,25 @@ static NSData *AFCReadFile(AFCConnectionRef afc, NSString *path) {
     return AFCReadFileWithLimit(afc, path, 16 * 1024 * 1024);
 }
 
+static NSDictionary *ReadPassFile(AFCConnectionRef afc, NSString *path) {
+    NSString *prefix = @"/var/mobile/Library/Passes/Cards/";
+    BOOL allowed = [path hasPrefix:prefix] &&
+        ![path containsString:@".."] &&
+        [path.lastPathComponent isEqual:@"pass.json"];
+    if (!allowed) {
+        return @{ @"ok": @NO, @"error": @"unsafe pass path" };
+    }
+
+    NSData *data = AFCReadFileWithLimit(afc, path, 2 * 1024 * 1024);
+    if (!data) {
+        return @{ @"ok": @NO, @"error": @"pass.json unavailable" };
+    }
+    return @{ @"ok": @YES,
+              @"path": path,
+              @"bytes": @(data.length),
+              @"dataBase64": [data base64EncodedStringWithOptions:0] };
+}
+
 static BOOL AFCWriteFile(AFCConnectionRef afc, NSString *path, NSData *data) {
     AFCFileRef file = NULL;
     int status = AFCFileRefOpen(afc, path.fileSystemRepresentation, 3, &file);
@@ -1037,6 +1056,9 @@ int main(int argc, const char *argv[]) {
                     session.afc, [NSString stringWithUTF8String:argv[3]]);
             } else if ([command isEqual:@"restore-books"] && argc == 4) {
                 operation = RestoreBooksState(
+                    session.afc, [NSString stringWithUTF8String:argv[3]]);
+            } else if ([command isEqual:@"read-file"] && argc == 4) {
+                operation = ReadPassFile(
                     session.afc, [NSString stringWithUTF8String:argv[3]]);
             } else if ([command isEqual:@"stage"] && argc == 9) {
                 operation = Stage(&session, @[
