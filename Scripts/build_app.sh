@@ -20,7 +20,13 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/bin/device_helper" "$APP/Contents/Resources/bin/device_helper"
 cp "$ROOT/Resources/bin/airtraffic_host" "$APP/Contents/Resources/bin/airtraffic_host"
 chmod +x "$APP/Contents/MacOS/AirCardMac" "$APP/Contents/Resources/bin/"*
-cp "$ROOT/Resources/Assets.car" "$APP/Contents/Resources/Assets.car"
+# The checked-in Assets.car is the Xcode/Icon Composer artifact. The local
+# fallback uses the same layered vector source rendered into AirCardIcon.icns
+# so the app remains buildable on machines that only have Command Line Tools.
+# Opt into the compiled catalog when actool has been run on a full-Xcode Mac.
+if [[ "${AIRCARD_USE_COMPILED_ICON:-1}" == "1" ]]; then
+  cp "$ROOT/Resources/Assets.car" "$APP/Contents/Resources/Assets.car"
+fi
 cp "$ROOT/Resources/AirCardIcon.icns" "$APP/Contents/Resources/AirCardIcon.icns"
 cp -R "$ROOT/Resources/AirCardIcon.icon" "$APP/Contents/Resources/AirCardIcon.icon"
 
@@ -32,6 +38,10 @@ for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovi
   xattr -d "$attribute" "$APP" 2>/dev/null || true
   xattr -dr "$attribute" "$APP" 2>/dev/null || true
 done
+# Finder can reattach these two bundle-level attributes in a synced workspace;
+# clear them once more immediately before sealing the app.
+xattr -d com.apple.FinderInfo "$APP" 2>/dev/null || true
+xattr -d 'com.apple.fileprovider.fpfs#P' "$APP" 2>/dev/null || true
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 

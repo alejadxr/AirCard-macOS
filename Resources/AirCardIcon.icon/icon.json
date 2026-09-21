@@ -11,22 +11,31 @@
       "name" : "Frost Glass Capsule",
       "lighting" : "combined",
       "specular" : true,
-      "blur-material" : 0.45,
-      "translucency" : { "enabled" : true, "value" : 0.42 },
-      "shadow" : { "kind" : "neutral", "opacity" : 0.42 },
+      "blur-material" : 0.16,
+      "translucency" : { "enabled" : true, "value" : 0.62 },
+      "shadow" : { "kind" : "neutral", "opacity" : 0.52 },
       "layers" : [
-        { "name" : "01 Capsule", "image-name" : "01-capsule.svg" },
-        { "name" : "02 Cyan Refraction", "image-name" : "02-cyan-rim.svg", "opacity" : 0.88 }
+        { "name" : "01 Midnight Capsule", "image-name" : "01-capsule.svg", "glass" : true },
+        { "name" : "02 Inner Depth", "image-name" : "02-inner-depth.svg", "glass" : true, "opacity" : 0.92 },
+        { "name" : "03 Cyan Refraction", "image-name" : "03-cyan-refraction.svg", "glass" : true, "opacity" : 0.88 },
+        { "name" : "04 Violet Refraction", "image-name" : "04-violet-refraction.svg", "glass" : true, "opacity" : 0.82 },
+        { "name" : "05 Specular Sweep", "image-name" : "05-specular-sweep.svg", "glass" : true, "opacity" : 0.72 }
       ]
     },
     {
-      "name" : "AirCard Mark",
+      "name" : "AirCard Payment Mark",
       "lighting" : "individual",
       "specular" : true,
+      "shadow" : { "kind" : "layer-color", "opacity" : 0.38 },
+      "translucency" : { "enabled" : true, "value" : 0.24 },
       "layers" : [
-        { "name" : "03 Card Body", "image-name" : "03-card-body.svg" },
-        { "name" : "04 Card Stripe", "image-name" : "04-card-stripe.svg" },
-        { "name" : "05 Card Slot", "image-name" : "05-card-slot.svg" }
+        { "name" : "06 Card Shadow", "image-name" : "06-card-shadow.svg", "opacity" : 0.52 },
+        { "name" : "07 Frost Card", "image-name" : "07-card-body.svg" },
+        { "name" : "08 Card Edge", "image-name" : "08-card-edge.svg", "opacity" : 0.9 },
+        { "name" : "09 Metal Chip", "image-name" : "09-chip.svg" },
+        { "name" : "10 Chip Circuit", "image-name" : "10-chip-circuit.svg", "opacity" : 0.8 },
+        { "name" : "11 Contactless Signal", "image-name" : "11-contactless.svg", "opacity" : 0.94 },
+        { "name" : "12 Card Detail", "image-name" : "12-card-detail.svg", "opacity" : 0.62 }
       ]
     }
   ]

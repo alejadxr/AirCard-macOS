@@ -1,3 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect x="76" y="76" width="872" height="872" rx="226" fill="#0B55D9"/>
+  <defs>
+    <linearGradient id="midnight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071329"/>
+      <stop offset="0.52" stop-color="#0B2459"/>
+      <stop offset="1" stop-color="#020817"/>
+    </linearGradient>
+    <radialGradient id="blueGlow" cx="0.16" cy="0.04" r="0.82">
+      <stop offset="0" stop-color="#2C8CFF" stop-opacity="0.34"/>
+      <stop offset="0.58" stop-color="#1653C5" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#1653C5" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="56" y="56" width="912" height="912" rx="250" fill="#020713" opacity="0.76"/>
+  <rect x="64" y="64" width="896" height="896" rx="240" fill="url(#midnight)"/>
+  <rect x="64" y="64" width="896" height="896" rx="240" fill="url(#blueGlow)"/>
+  <path d="M301 70H714c137 0 240 103 240 240v26C816 209 661 133 480 133S208 209 70 336v-26C70 173 173 70 301 70Z" fill="#FFFFFF" opacity="0.045"/>
 </svg>

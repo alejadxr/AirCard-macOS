@@ -10,7 +10,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text("Wallet card skin · Swift Concurrency · v0.2.2")
+                        Text("Wallet card skin · Swift Concurrency · v0.2.4")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
