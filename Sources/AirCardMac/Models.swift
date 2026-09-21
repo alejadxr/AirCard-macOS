@@ -16,6 +16,7 @@ struct DeviceInfo: Identifiable, Hashable, Sendable {
 
 struct PreparedArtwork: Sendable {
     let png: Data
+    let png2x: Data
     let pdf: Data
     let sourceWidth: Int
     let sourceHeight: Int

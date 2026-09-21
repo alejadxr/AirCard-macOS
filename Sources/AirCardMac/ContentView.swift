@@ -10,7 +10,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text("Wallet card skin · Swift Concurrency · v0.1.9")
+                        Text("Wallet card skin · Swift Concurrency · v0.2.0")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -74,14 +74,9 @@ struct ContentView: View {
                         Text("Se ajusta al lienzo conservando los bordes y se genera el PNG/PDF que espera Wallet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Picker("Variante experimental", selection: $model.cardVariant) {
-                            ForEach(PasscodeVariant.allCases) { variant in
-                                Text(variant.label).tag(variant)
-                            }
-                        }
-                        Text("Se escriben los assets normales y nombres adicionales --white/--black para probar si esta versión de iOS los reconoce. No necesitas un .passthm.")
+                        Text("Se escriben las variantes canónicas 3x, 2x y PDF que usan Wallet: cardBackgroundCombined, diffuse, background y strip. No necesitas un .passthm.")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.secondary)
                         Text("Antes de aplicar: iPhone desbloqueado y Apple Books abierto al menos una vez.")
                             .font(.caption)
                             .foregroundStyle(.orange)

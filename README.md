@@ -51,10 +51,10 @@ se intentan invalidar sus cachés.
 
 - Port funcional inicial de Wallet card skin.
 - Detección nativa de iPhones emparejados.
-- Preparación a 1536×969 PNG/PDF conservando los bordes de la imagen.
+- Preparación a 1536×969 y 1024×646 PNG, más PDF, conservando los bordes de la imagen.
 - Flash por batch y limpieza/restauración de Books.
-- Artwork de tarjetas Apple Pay mediante `cardBackgroundCombined`; el color de los números lo decide iOS.
-- Selector experimental `--white` / `--black` en Artwork, que escribe nombres de assets adicionales sin quitar los nombres canónicos.
+- Artwork de tarjetas Apple Pay mediante los nombres canónicos `cardBackgroundCombined`, `diffuse`, `background` y `strip` en 3x, 2x y PDF.
+- El color de los números de una tarjeta Apple Pay lo decide iOS/el emisor; Wallet no reconoce sufijos `--white` / `--black` para estos assets.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 - Generación de variantes de teclado `--white`, `--black`, `--white-bold` y `--black-bold`.
 
@@ -85,6 +85,7 @@ escribe como `--white` o `--black`; si la imagen es `-bold`, se usa
 
 Para tarjetas Apple Pay, iOS dibuja los números y normalmente decide su color
 internamente; el port original tampoco modifica `pass.json`, solo reemplaza el
-artwork y limpia las cachés de Wallet. El selector experimental escribe además
-variantes con sufijo `--white` o `--black` para comprobar si una build concreta
-de iOS las reconoce, pero puede ignorarlas.
+artwork y limpia las cachés de Wallet. La build actual escribe además los
+assets canónicos `diffuse`, `background` y `strip`, siguiendo el port iOS
+relacionado, porque algunas variantes de Wallet pueden leer esos nombres en
+lugar de `cardBackgroundCombined`.
