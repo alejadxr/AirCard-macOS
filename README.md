@@ -78,9 +78,9 @@ y pulsa “Aplicar color al teclado”. El port conserva los nombres y variantes
 paquete, convierte JPG/JPEG a PNG y hace la escritura por lotes con fallback
 individual. Después bloquea el iPhone para que TelephonyUI recargue la caché.
 
-Además de conservar el nombre original, cada imagen genera variantes `--white` y
-`--black`; si la imagen es `-bold`, también se generan `--white-bold` y
-`--black-bold`.
+Además de conservar el nombre original, la variante elegida en la interfaz se
+escribe como `--white` o `--black`; si la imagen es `-bold`, se usa
+`--white-bold` o `--black-bold` respectivamente.
 
 Para tarjetas Apple Pay, iOS dibuja los números y decide su color internamente;
 el port original tampoco modifica `pass.json`, solo reemplaza el artwork y

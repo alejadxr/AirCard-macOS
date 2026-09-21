@@ -14,7 +14,7 @@ final class AppModel: ObservableObject {
     @Published var passcodeTheme: PasscodeTheme?
     @Published var passcodePreview: NSImage?
     @Published var passcodeThemeName = ""
-    @Published var passcodeColor = Color.white
+    @Published var passcodeVariant = PasscodeVariant.white
     @Published var passcodeTargetVersion = "TelephonyUI-10"
     @Published var cardTextColor = Color.white
     @Published var status = "Listo. Conecta y desbloquea el iPhone."
@@ -93,7 +93,7 @@ final class AppModel: ObservableObject {
         isBusy = true
         status = "Abriendo el tema del teclado…"
         currentTask?.cancel()
-        let tint = currentPasscodeTint()
+        let tint = passcodeVariant.tint
         currentTask = Task { [weak self] in
             do {
                 let loaded = try await Task.detached(priority: .userInitiated) {
@@ -111,7 +111,7 @@ final class AppModel: ObservableObject {
                 self?.passcodeThemeName = loaded.name
                 self?.passcodeTargetVersion = loaded.detectedVersion
                 self?.passcodePreview = NSImage(data: previewData)
-                self?.status = "Tema listo: \(loaded.name). Elige un color y aplícalo."
+                self?.status = "Tema listo: \(loaded.name). Elige --white o --black y aplícalo."
                 self?.log("Tema de teclado preparado: \(loaded.name) [\(loaded.detectedVersion)]")
             } catch is CancellationError {
                 self?.status = "Operación cancelada."
@@ -126,7 +126,7 @@ final class AppModel: ObservableObject {
     func recolorPasscodePreview() {
         guard let theme = passcodeTheme else { return }
         passcodePreviewTask?.cancel()
-        let tint = currentPasscodeTint()
+        let tint = passcodeVariant.tint
         let target = passcodeTargetVersion
         passcodePreviewTask = Task { [weak self] in
             do {
@@ -160,7 +160,8 @@ final class AppModel: ObservableObject {
             isScanning = false
             log("Escaneo detenido; esperando el cierre del helper nativo…")
         }
-        let tint = currentPasscodeTint()
+        let tint = passcodeVariant.tint
+        let variant = passcodeVariant
         let target = passcodeTargetVersion
         currentTask = Task { [weak self] in
             do {
@@ -174,6 +175,7 @@ final class AppModel: ObservableObject {
                     theme: theme,
                     device: device,
                     color: tint,
+                    variant: variant,
                     targetVersion: target
                 ) { message in
                     await MainActor.run {
@@ -192,15 +194,6 @@ final class AppModel: ObservableObject {
             }
             self?.isBusy = false
         }
-    }
-
-    func currentPasscodeTint() -> PasscodeTint {
-        let color = NSColor(passcodeColor).usingColorSpace(.deviceRGB) ?? .white
-        return PasscodeTint(
-            red: Double(color.redComponent),
-            green: Double(color.greenComponent),
-            blue: Double(color.blueComponent)
-        )
     }
 
     func currentCardTextColor() -> PasscodeTint {

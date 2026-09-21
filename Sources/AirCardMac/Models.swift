@@ -27,6 +27,18 @@ struct PasscodeTint: Sendable, Equatable {
     let blue: Double
 
     static let white = PasscodeTint(red: 1, green: 1, blue: 1)
+    static let black = PasscodeTint(red: 0, green: 0, blue: 0)
+}
+
+enum PasscodeVariant: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case white
+    case black
+
+    var id: String { rawValue }
+    var label: String { "--\(rawValue)" }
+    var tint: PasscodeTint {
+        self == .white ? .white : .black
+    }
 }
 
 struct PasscodeAsset: Sendable {

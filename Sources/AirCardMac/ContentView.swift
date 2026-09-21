@@ -10,7 +10,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text("Wallet card skin · Swift Concurrency · v0.1.7")
+                    Text("Wallet card skin · Swift Concurrency · v0.1.8")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -128,11 +128,15 @@ struct ContentView: View {
                                 .lineLimit(1)
                         }
                         HStack(spacing: 14) {
-                            ColorPicker("Color", selection: $model.passcodeColor, supportsOpacity: false)
-                                .frame(width: 170)
-                                .onChange(of: model.passcodeColor) { _, _ in
-                                    model.recolorPasscodePreview()
+                            Picker("Variante", selection: $model.passcodeVariant) {
+                                ForEach(PasscodeVariant.allCases) { variant in
+                                    Text(variant.label).tag(variant)
                                 }
+                            }
+                            .frame(width: 170)
+                            .onChange(of: model.passcodeVariant) { _, _ in
+                                model.recolorPasscodePreview()
+                            }
                             Picker("Caché", selection: $model.passcodeTargetVersion) {
                                 Text("TelephonyUI-10").tag("TelephonyUI-10")
                                 Text("TelephonyUI-9").tag("TelephonyUI-9")
@@ -143,7 +147,7 @@ struct ContentView: View {
                                 model.recolorPasscodePreview()
                             }
                         }
-                        Text("Solo necesitas esta sección si también quieres cambiar el teclado de código; para los números de Wallet usa el selector de arriba.")
+                        Text("Elige el sufijo que probará iOS: --white o --black. Las variantes -bold se generan automáticamente cuando corresponde.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Aplicar color al teclado") { model.flashPasscodeTheme() }

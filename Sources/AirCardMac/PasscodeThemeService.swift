@@ -79,6 +79,7 @@ struct PasscodeThemeService: Sendable {
         theme: PasscodeTheme,
         device: DeviceInfo,
         color: PasscodeTint,
+        variant: PasscodeVariant,
         targetVersion: String,
         progress: @escaping @Sendable (String) async -> Void
     ) async throws -> PasscodeFlashResult {
@@ -88,9 +89,9 @@ struct PasscodeThemeService: Sendable {
             throw AirCardError.processFailed("El tema no tiene assets para (targetVersion).")
         }
 
-        await progress("Recoloreando las teclas a \(Self.hex(color)) y generando variantes --white/--black…")
+        await progress("Preparando variante --\(variant.rawValue) con glifos \(Self.hex(color))…")
         let files = try await Task.detached(priority: .userInitiated) {
-            try Self.recoloredFiles(selectedAssets, tint: color)
+            try Self.recoloredFiles(selectedAssets, tint: color, variant: variant)
         }.value
 
         guard !files.isEmpty else {
@@ -125,7 +126,8 @@ struct PasscodeThemeService: Sendable {
 
     private static func recoloredFiles(
         _ assets: [PasscodeAsset],
-        tint: PasscodeTint
+        tint: PasscodeTint,
+        variant: PasscodeVariant
     ) throws -> [(String, Data)] {
         var output: [String: Data] = [:]
         for asset in assets {
@@ -137,19 +139,16 @@ struct PasscodeThemeService: Sendable {
             let tinted = try recolor(asset.data, tint: tint)
             output[outputName] = tinted
 
-            // iOS TelephonyUI uses the suffix as part of the cache key. Keep
-            // the original file and also emit both appearance variants so a
-            // theme that only ships --white can be tested against --black.
-            for variant in colorVariantNames(outputName) {
-                output[variant] = tinted
-            }
+            // iOS TelephonyUI uses the suffix as part of the cache key. Write
+            // the variant selected in the UI, including its bold form.
+            output[selectedVariantName(outputName, variant: variant)] = tinted
         }
         return output
             .sorted { $0.key < $1.key }
             .map { ($0.key, $0.value) }
     }
 
-    private static func colorVariantNames(_ name: String) -> [String] {
+    private static func selectedVariantName(_ name: String, variant: PasscodeVariant) -> String {
         let stem = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
         let lowerStem = stem.lowercased()
         let markers = ["--white-bold", "--black-bold", "--white", "--black"]
@@ -164,10 +163,7 @@ struct PasscodeThemeService: Sendable {
         }
 
         let boldSuffix = bold ? "-bold" : ""
-        return [
-            "\(base)--white\(boldSuffix).png",
-            "\(base)--black\(boldSuffix).png"
-        ]
+        return "\(base)--\(variant.rawValue)\(boldSuffix).png"
     }
 
     private static func recolor(_ data: Data, tint: PasscodeTint) throws -> Data {
