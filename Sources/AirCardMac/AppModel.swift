@@ -1,0 +1,185 @@
+import AppKit
+import Foundation
+import SwiftUI
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published var devices: [DeviceInfo] = []
+    @Published var selectedDeviceID = ""
+    @Published var cardHash = ""
+    @Published var artwork: PreparedArtwork?
+    @Published var artworkPreview: NSImage?
+    @Published var imageName = ""
+    @Published var status = "Listo. Conecta y desbloquea el iPhone."
+    @Published var logs: [String] = []
+    @Published var isBusy = false
+    @Published var isScanning = false
+
+    private let service = WalletSkinService()
+    private var currentTask: Task<Void, Never>?
+    private var scanTask: Task<Void, Never>?
+
+    init() {
+        refreshDevices()
+    }
+
+    func refreshDevices() {
+        scanTask?.cancel()
+        isScanning = false
+        currentTask?.cancel()
+        status = "Buscando iPhone emparejados…"
+        currentTask = Task { [weak self] in
+            do {
+                let devices = try await WalletSkinService().listDevices()
+                guard !Task.isCancelled else { return }
+                self?.devices = devices
+                if self?.selectedDeviceID.isEmpty == true {
+                    self?.selectedDeviceID = devices.first?.id ?? ""
+                }
+                self?.status = devices.isEmpty
+                    ? "No encontré un iPhone. Conéctalo por USB y pulsa ‘Confiar’."
+                    : "Encontré \(devices.count) iPhone(s)."
+                self?.log(devices.isEmpty ? "No hay dispositivos disponibles." : "Dispositivos: \(devices.map(\.name).joined(separator: ", "))")
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("Error de detección: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func chooseArtwork() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .webP, .image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isBusy = true
+        status = "Preparando imagen a 1536 × 969…"
+        currentTask?.cancel()
+        currentTask = Task { [weak self] in
+            do {
+                let prepared = try await Task.detached(priority: .userInitiated) {
+                    try ImageProcessor.prepare(url: url)
+                }.value
+                guard !Task.isCancelled else { return }
+                self?.artwork = prepared
+                self?.artworkPreview = NSImage(data: prepared.png)
+                self?.imageName = url.lastPathComponent
+                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969."
+                self?.log("Artwork preparado: \(url.lastPathComponent)")
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("No pude preparar la imagen: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func flashSkin() {
+        guard let device = devices.first(where: { $0.id == selectedDeviceID }) else {
+            status = "Selecciona un iPhone conectado."
+            return
+        }
+        guard let artwork else {
+            status = "Selecciona una imagen primero."
+            return
+        }
+        guard service.validateCardHash(cardHash) != nil else {
+            status = "Introduce un hash de tarjeta válido."
+            return
+        }
+
+        currentTask?.cancel()
+        isBusy = true
+        status = "Escribiendo skin en \(device.name)…"
+        let scanToStop = scanTask
+        if let scanToStop {
+            scanToStop.cancel()
+            isScanning = false
+            log("Escaneo detenido; esperando el cierre del helper nativo…")
+        }
+        let rawCardHash = cardHash
+        currentTask = Task { [weak self] in
+            do {
+                if let scanToStop {
+                    await scanToStop.value
+                    try Task.checkCancellation()
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                self?.log("Inicio de flash para \(device.name).")
+                let result = try await WalletSkinService().flash(
+                    device: device,
+                    cardHash: rawCardHash,
+                    artwork: artwork
+                ) { message in
+                    await MainActor.run {
+                        self?.status = message
+                        self?.log(message)
+                    }
+                }
+                guard !Task.isCancelled else { return }
+                self?.status = "Skin aplicada a \(result.cardHash). Cierra y abre Wallet en el iPhone."
+                self?.log("Completado: \(result.artworkFiles) assets; \(result.cacheFiles) cachés tocadas.")
+            } catch is CancellationError {
+                self?.status = "Operación cancelada."
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("Flash fallido: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func toggleScan() {
+        if isScanning {
+            scanTask?.cancel()
+            isScanning = false
+            status = "Escaneo detenido."
+            log("Escaneo de syslog detenido.")
+            return
+        }
+        guard let device = devices.first(where: { $0.id == selectedDeviceID }) else {
+            status = "Selecciona un iPhone conectado."
+            return
+        }
+        do {
+            let helper = try NativeTools.helperURL(named: "device_helper")
+            isScanning = true
+            status = "Abre Wallet y toca la tarjeta para detectarla…"
+            log("Escuchando syslog de \(device.name).")
+            scanTask = Task { [weak self] in
+                do {
+                    for try await line in DeviceLogScanner.lines(helper: helper, udid: device.id) {
+                        guard !Task.isCancelled else { return }
+                        if let hash = WalletSkinService().extractCardHash(from: line) {
+                            self?.cardHash = hash
+                            self?.status = "Tarjeta detectada: \(hash)"
+                            self?.log("Hash detectado automáticamente.")
+                        }
+                    }
+                } catch is CancellationError {
+                    // User stopped the scanner.
+                } catch {
+                    self?.status = error.localizedDescription
+                    self?.log("Escaneo fallido: \(error.localizedDescription)")
+                }
+                self?.isScanning = false
+            }
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    func cancel() {
+        currentTask?.cancel()
+        scanTask?.cancel()
+        isScanning = false
+        isBusy = false
+        status = "Operación cancelada."
+    }
+
+    func log(_ message: String) {
+        logs.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+        if logs.count > 100 { logs.removeFirst(logs.count - 100) }
+    }
+}

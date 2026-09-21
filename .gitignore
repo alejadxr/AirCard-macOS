@@ -1,0 +1,6 @@
+.build/
+build/
+Resources/bin/
+.DS_Store
+*.dSYM/
+*.swp
