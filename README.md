@@ -40,7 +40,9 @@ Intel.
 Conecta un iPhone emparejado por USB, desbloquéalo y pulsa “Confiar”. Abre
 Apple Books una vez antes del primer flash. Pulsa “Escanear desde Wallet”, abre
 Apple Wallet y toca la tarjeta; el hash se rellenará solo. También puedes pegar
-el hash manualmente. Después elige una imagen y pulsa “Aplicar skin”. Al
+el hash manualmente. Después elige una imagen, añade uno o varios overlays PNG
+transparentes si quieres, y pulsa “Aplicar skin”. Los overlays se combinan en
+el orden mostrado y se incluyen en todas las variantes que recibe Wallet. Al
 terminar, cierra y abre Wallet en el iPhone.
 
 El flujo conserva/restaura los archivos temporales de Books y limpia los
@@ -52,6 +54,7 @@ se intentan invalidar sus cachés.
 - Port funcional inicial de Wallet card skin.
 - Detección nativa de iPhones emparejados.
 - Preparación a 1536×969 y 1024×646 PNG, más PDF, conservando los bordes de la imagen.
+- Overlays PNG múltiples con transparencia, reordenamiento y previsualización antes del flash.
 - Flash por batch y limpieza/restauración de Books.
 - Artwork de tarjetas Apple Pay mediante los nombres canónicos `cardBackgroundCombined`, `diffuse`, `background` y `strip` en 3x, 2x y PDF.
 - El color de los números de una tarjeta Apple Pay lo decide iOS/el emisor; Wallet no reconoce sufijos `--white` / `--black` para estos assets.

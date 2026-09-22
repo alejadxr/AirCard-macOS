@@ -10,7 +10,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text("Wallet card skin · Swift Concurrency · v0.2.4")
+                        Text("Wallet card skin · Swift Concurrency · v0.2.5")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -72,6 +72,56 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("Se ajusta al lienzo conservando los bordes y se genera el PNG/PDF que espera Wallet.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Divider()
+                        HStack {
+                            Text("Overlays PNG")
+                                .font(.headline)
+                            Spacer()
+                            Button("Añadir PNG…") { model.chooseOverlays() }
+                                .disabled(model.isBusy || model.artwork == nil)
+                        }
+                        if model.overlays.isEmpty {
+                            Text("Puedes añadir uno o varios PNG transparentes. Se combinan en el orden mostrado.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(model.overlays) { overlay in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "square.3.layers.3d")
+                                            .foregroundStyle(.blue)
+                                        Text(overlay.name)
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Button {
+                                            model.moveOverlayUp(overlay)
+                                        } label: {
+                                            Image(systemName: "chevron.up")
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .disabled(model.isBusy || model.overlays.first?.id == overlay.id)
+                                        Button {
+                                            model.moveOverlayDown(overlay)
+                                        } label: {
+                                            Image(systemName: "chevron.down")
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .disabled(model.isBusy || model.overlays.last?.id == overlay.id)
+                                        Button(role: .destructive) {
+                                            model.removeOverlay(overlay)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .disabled(model.isBusy)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        Text("El PNG se escala al lienzo de la tarjeta conservando transparencia y proporción.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("Se escriben las variantes canónicas 3x, 2x y PDF que usan Wallet: cardBackgroundCombined, diffuse, background y strip. No necesitas un .passthm.")

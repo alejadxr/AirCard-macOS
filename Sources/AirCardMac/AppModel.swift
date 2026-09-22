@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,6 +12,7 @@ final class AppModel: ObservableObject {
     @Published var artwork: PreparedArtwork?
     @Published var artworkPreview: NSImage?
     @Published var imageName = ""
+    @Published var overlays: [ArtworkOverlay] = []
     @Published var passcodeTheme: PasscodeTheme?
     @Published var passcodePreview: NSImage?
     @Published var passcodeThemeName = ""
@@ -22,6 +24,7 @@ final class AppModel: ObservableObject {
     @Published var isScanning = false
 
     private let service = WalletSkinService()
+    private var artworkSourceURL: URL?
     private var currentTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
     private var passcodePreviewTask: Task<Void, Never>?
@@ -62,21 +65,100 @@ final class AppModel: ObservableObject {
 
         isBusy = true
         status = "Preparando imagen a 1536 × 969…"
+        artworkSourceURL = url
         currentTask?.cancel()
+        let overlaySnapshot = overlays
         currentTask = Task { [weak self] in
             do {
                 let prepared = try await Task.detached(priority: .userInitiated) {
-                    try ImageProcessor.prepare(url: url)
+                    try ImageProcessor.prepare(url: url, overlays: overlaySnapshot)
                 }.value
                 guard !Task.isCancelled else { return }
                 self?.artwork = prepared
                 self?.artworkPreview = NSImage(data: prepared.png)
                 self?.imageName = url.lastPathComponent
-                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969, conservando bordes."
-                self?.log("Artwork preparado: \(url.lastPathComponent)")
+                let overlayText = overlaySnapshot.isEmpty
+                    ? "sin overlays"
+                    : "\(overlaySnapshot.count) overlay(s)"
+                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969, \(overlayText)."
+                self?.log("Artwork preparado: \(url.lastPathComponent) [\(overlayText)]")
             } catch {
                 self?.status = error.localizedDescription
                 self?.log("No pude preparar la imagen: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func chooseOverlays() {
+        guard artworkSourceURL != nil else {
+            status = "Selecciona primero la imagen base de la tarjeta."
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png]
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+
+        do {
+            let imported = try panel.urls.map { url in
+                let data = try Data(contentsOf: url)
+                guard CGImageSourceCreateWithData(data as CFData, nil) != nil else {
+                    throw AirCardError.processFailed("No pude leer el PNG \(url.lastPathComponent).")
+                }
+                return ArtworkOverlay(name: url.lastPathComponent, data: data)
+            }
+            guard !imported.isEmpty else { return }
+            overlays.append(contentsOf: imported)
+            log("Overlays añadidos: \(imported.map(\.name).joined(separator: ", "))")
+            rebuildArtwork(status: "Aplicando \(overlays.count) overlay(s) PNG…")
+        } catch {
+            status = error.localizedDescription
+            log("No pude añadir el overlay: \(error.localizedDescription)")
+        }
+    }
+
+    func removeOverlay(_ overlay: ArtworkOverlay) {
+        overlays.removeAll { $0.id == overlay.id }
+        log("Overlay quitado: \(overlay.name)")
+        rebuildArtwork(status: overlays.isEmpty ? "Quitando overlays PNG…" : "Actualizando overlays PNG…")
+    }
+
+    func moveOverlayUp(_ overlay: ArtworkOverlay) {
+        guard let index = overlays.firstIndex(where: { $0.id == overlay.id }), index > 0 else { return }
+        overlays.swapAt(index, index - 1)
+        rebuildArtwork(status: "Reordenando overlays PNG…")
+    }
+
+    func moveOverlayDown(_ overlay: ArtworkOverlay) {
+        guard let index = overlays.firstIndex(where: { $0.id == overlay.id }), index + 1 < overlays.count else { return }
+        overlays.swapAt(index, index + 1)
+        rebuildArtwork(status: "Reordenando overlays PNG…")
+    }
+
+    private func rebuildArtwork(status message: String) {
+        guard let sourceURL = artworkSourceURL else { return }
+        currentTask?.cancel()
+        isBusy = true
+        status = message
+        let overlaySnapshot = overlays
+        currentTask = Task { [weak self] in
+            do {
+                let prepared = try await Task.detached(priority: .userInitiated) {
+                    try ImageProcessor.prepare(url: sourceURL, overlays: overlaySnapshot)
+                }.value
+                guard !Task.isCancelled else { return }
+                self?.artwork = prepared
+                self?.artworkPreview = NSImage(data: prepared.png)
+                self?.status = overlaySnapshot.isEmpty
+                    ? "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969."
+                    : "Artwork actualizado con \(overlaySnapshot.count) overlay(s) PNG."
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("No pude actualizar los overlays: \(error.localizedDescription)")
             }
             self?.isBusy = false
         }

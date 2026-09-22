@@ -9,16 +9,34 @@ enum ImageProcessor {
     static let target2xWidth = 1_024
     static let target2xHeight = 646
 
-    static func prepare(url: URL) throws -> PreparedArtwork {
+    static func prepare(url: URL, overlays: [ArtworkOverlay] = []) throws -> PreparedArtwork {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw AirCardError.processFailed("No pude leer la imagen seleccionada.")
         }
 
+        let overlayImages = try overlays.map { overlay in
+            guard let source = CGImageSourceCreateWithData(overlay.data as CFData, nil),
+                  let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                throw AirCardError.processFailed("No pude leer el overlay PNG \(overlay.name).")
+            }
+            return image
+        }
+
         let sourceWidth = image.width
         let sourceHeight = image.height
-        let resized = try render(image, width: targetWidth, height: targetHeight)
-        let resized2x = try render(image, width: target2xWidth, height: target2xHeight)
+        let resized = try render(
+            image,
+            width: targetWidth,
+            height: targetHeight,
+            overlays: overlayImages
+        )
+        let resized2x = try render(
+            image,
+            width: target2xWidth,
+            height: target2xHeight,
+            overlays: overlayImages
+        )
 
         let png = try encodePNG(resized)
         let png2x = try encodePNG(resized2x)
@@ -32,7 +50,12 @@ enum ImageProcessor {
         )
     }
 
-    private static func render(_ image: CGImage, width: Int, height: Int) throws -> CGImage {
+    private static func render(
+        _ image: CGImage,
+        width: Int,
+        height: Int,
+        overlays: [CGImage]
+    ) throws -> CGImage {
         let scale = min(
             CGFloat(width) / CGFloat(image.width),
             CGFloat(height) / CGFloat(image.height)
@@ -65,10 +88,41 @@ enum ImageProcessor {
         // below keeps every source pixel, including borders, at its proportions.
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         context.draw(image, in: fittedRect)
+
+        for overlay in overlays {
+            let overlayRect = aspectFitRect(
+                imageWidth: overlay.width,
+                imageHeight: overlay.height,
+                in: CGRect(x: 0, y: 0, width: width, height: height)
+            )
+            context.draw(overlay, in: overlayRect)
+        }
+
         guard let rendered = context.makeImage() else {
             throw AirCardError.processFailed("No pude redimensionar la imagen.")
         }
         return rendered
+    }
+
+    private static func aspectFitRect(
+        imageWidth: Int,
+        imageHeight: Int,
+        in canvas: CGRect
+    ) -> CGRect {
+        let scale = min(
+            canvas.width / CGFloat(imageWidth),
+            canvas.height / CGFloat(imageHeight)
+        )
+        let size = CGSize(
+            width: CGFloat(imageWidth) * scale,
+            height: CGFloat(imageHeight) * scale
+        )
+        return CGRect(
+            x: canvas.midX - size.width / 2,
+            y: canvas.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
     }
 
     private static func encodePNG(_ image: CGImage) throws -> Data {
