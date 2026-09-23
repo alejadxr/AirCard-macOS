@@ -4,6 +4,12 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct PasscodeKeyTile: Identifiable {
+    let key: String
+    let image: NSImage?
+    var id: String { key }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var devices: [DeviceInfo] = []
@@ -15,9 +21,13 @@ final class AppModel: ObservableObject {
     @Published var overlays: [ArtworkOverlay] = []
     @Published var passcodeTheme: PasscodeTheme?
     @Published var passcodePreview: NSImage?
+    @Published var passcodeKeyTiles: [PasscodeKeyTile] = []
+    @Published var passcodePlannedFiles: [String] = []
     @Published var passcodeThemeName = ""
     @Published var passcodeVariant = PasscodeVariant.white
-    @Published var passcodeTargetVersion = "TelephonyUI-10"
+    @Published var passcodeLanguage = PasscodeLanguage.english
+    @Published var passcodeBold = false
+    @Published var passcodeTargetVersion = PasscodeCache.auto
     @Published var status = "Listo. Conecta y desbloquea el iPhone."
     @Published var logs: [String] = []
     @Published var isBusy = false
@@ -200,6 +210,7 @@ final class AppModel: ObservableObject {
         status = "Abriendo el tema del teclado…"
         currentTask?.cancel()
         let tint = passcodeVariant.tint
+        let selection = passcodeTargetVersion
         currentTask = Task { [weak self] in
             do {
                 let loaded = try await Task.detached(priority: .userInitiated) {
@@ -215,8 +226,11 @@ final class AppModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 self?.passcodeTheme = loaded
                 self?.passcodeThemeName = loaded.name
-                self?.passcodeTargetVersion = loaded.detectedVersion
+                if selection != PasscodeCache.auto {
+                    self?.passcodeTargetVersion = loaded.detectedVersion
+                }
                 self?.passcodePreview = NSImage(data: previewData)
+                self?.recolorPasscodePreview()
                 self?.status = "Tema listo: \(loaded.name). Elige --white o --black y aplícalo."
                 self?.log("Tema de teclado preparado: \(loaded.name) [\(loaded.detectedVersion)]")
             } catch is CancellationError {
@@ -233,18 +247,120 @@ final class AppModel: ObservableObject {
         guard let theme = passcodeTheme else { return }
         passcodePreviewTask?.cancel()
         let tint = passcodeVariant.tint
-        let target = passcodeTargetVersion
+        let variant = passcodeVariant
+        let language = passcodeLanguage
+        let bold = passcodeBold
+        let target = PasscodeCache.resolve(passcodeTargetVersion, device: selectedDevice)
+        passcodePlannedFiles = PasscodeThemeService().plannedFileNames(
+            theme: theme,
+            variant: variant,
+            language: language,
+            bold: bold,
+            targetVersion: target
+        )
         passcodePreviewTask = Task { [weak self] in
             do {
-                let data = try await Task.detached(priority: .userInitiated) {
-                    try PasscodeThemeService().preview(theme: theme, color: tint, targetVersion: target)
+                let (data, keys) = try await Task.detached(priority: .userInitiated) {
+                    let service = PasscodeThemeService()
+                    return (
+                        try service.preview(theme: theme, color: tint, targetVersion: target),
+                        try service.keyPreviews(theme: theme, color: tint, targetVersion: target)
+                    )
                 }.value
                 guard !Task.isCancelled else { return }
                 self?.passcodePreview = NSImage(data: data)
+                let images = Dictionary(uniqueKeysWithValues: keys.map { ($0.key, $0.png) })
+                self?.passcodeKeyTiles = keys.isEmpty ? [] : PasscodeKeyPreview.keypadOrder.map { key in
+                    PasscodeKeyTile(key: key, image: images[key].flatMap { NSImage(data: $0) })
+                }
             } catch {
                 self?.log("No pude actualizar la previsualización: \(error.localizedDescription)")
             }
         }
+    }
+
+    func exportPasscodeTheme() {
+        guard let theme = passcodeTheme else {
+            status = "Selecciona un tema .passthm primero."
+            return
+        }
+        let tint = passcodeVariant.tint
+        let variant = passcodeVariant
+        let language = passcodeLanguage
+        let bold = passcodeBold
+        let target = PasscodeCache.resolve(passcodeTargetVersion, device: selectedDevice)
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "passthm") ?? .zip]
+        panel.nameFieldStringValue = "\(theme.name)-\(variant.rawValue)\(bold ? "-bold" : "").passthm"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        currentTask?.cancel()
+        isBusy = true
+        status = "Exportando el teclado recoloreado…"
+        currentTask = Task { [weak self] in
+            do {
+                let service = PasscodeThemeService()
+                let files = try await service.preparedFiles(
+                    theme: theme,
+                    color: tint,
+                    variant: variant,
+                    language: language,
+                    bold: bold,
+                    targetVersion: target
+                )
+                try await service.export(files: files, targetVersion: target, to: url)
+                self?.status = "Tema exportado: \(url.lastPathComponent) (\(files.count) archivos)."
+                self?.log("Teclado exportado en \(url.path) [\(target)]")
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch is CancellationError {
+                self?.status = "Operación cancelada."
+            } catch {
+                self?.status = error.localizedDescription
+                self?.log("No pude exportar el teclado: \(error.localizedDescription)")
+            }
+            self?.isBusy = false
+        }
+    }
+
+    func exportArtwork() {
+        guard let artwork else {
+            status = "Selecciona una imagen primero."
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Guardar aquí"
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+
+        let baseName = URL(fileURLWithPath: imageName).deletingPathExtension().lastPathComponent
+        let folder = directory.appendingPathComponent(
+            "\(baseName.isEmpty ? "AirCard" : baseName)-wallet",
+            isDirectory: true
+        )
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let files = WalletSkinService.artworkFiles(artwork)
+            for (name, data) in files {
+                try data.write(to: folder.appendingPathComponent(name), options: .atomic)
+            }
+            status = "Artwork exportado: \(folder.lastPathComponent) (\(files.count) archivos)."
+            log("Artwork exportado en \(folder.path)")
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
+        } catch {
+            status = error.localizedDescription
+            log("No pude exportar el artwork: \(error.localizedDescription)")
+        }
+    }
+
+    var passcodeResolvedCache: String {
+        PasscodeCache.resolve(passcodeTargetVersion, device: selectedDevice)
+    }
+
+    var passcodeAutoCacheLabel: String {
+        "Auto (\(PasscodeCache.resolve(PasscodeCache.auto, device: selectedDevice)))"
     }
 
     func flashPasscodeTheme() {
@@ -268,7 +384,9 @@ final class AppModel: ObservableObject {
         }
         let tint = passcodeVariant.tint
         let variant = passcodeVariant
-        let target = passcodeTargetVersion
+        let language = passcodeLanguage
+        let bold = passcodeBold
+        let target = PasscodeCache.resolve(passcodeTargetVersion, device: device)
         currentTask = Task { [weak self] in
             do {
                 if let scanToStop {
@@ -276,12 +394,14 @@ final class AppModel: ObservableObject {
                     try Task.checkCancellation()
                     try await Task.sleep(for: .milliseconds(300))
                 }
-                self?.log("Inicio de color de teclado para \(device.name).")
+                self?.log("Inicio de color de teclado para \(device.name) en \(target).")
                 let result = try await PasscodeThemeService().flash(
                     theme: theme,
                     device: device,
                     color: tint,
                     variant: variant,
+                    language: language,
+                    bold: bold,
                     targetVersion: target
                 ) { message in
                     await MainActor.run {

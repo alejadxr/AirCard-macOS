@@ -29,6 +29,9 @@ struct ContentView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
+                        .onChange(of: model.selectedDeviceID) { _, _ in
+                            model.recolorPasscodePreview()
+                        }
                         if model.devices.isEmpty {
                             Text("Sin dispositivo")
                                 .foregroundStyle(.secondary)
@@ -69,8 +72,23 @@ struct ContentView: View {
                         .foregroundStyle(model.isCardHashValid ? Color.accentColor : .secondary)
                         .lineLimit(1)
                     }
+                    .overlay(alignment: .bottom) {
+                        if model.artwork != nil {
+                            Text("Así se escribirá · 1536 × 969")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.thinMaterial, in: Capsule())
+                                .padding(6)
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 10) {
-                        Button("Elegir imagen…") { model.chooseArtwork() }
+                        HStack {
+                            Button("Elegir imagen…") { model.chooseArtwork() }
+                            Button("Descargar assets…") { model.exportArtwork() }
+                                .disabled(model.isBusy || model.artwork == nil)
+                                .help("Guarda los 11 archivos (PNG 3x/2x y PDF) que se escriben en la tarjeta.")
+                        }
                         Text(model.imageName.isEmpty ? "PNG, JPG o WebP" : model.imageName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -152,7 +170,34 @@ struct ContentView: View {
             GroupBox("5. Teclado de código (opcional)") {
                 HStack(spacing: 16) {
                     Group {
-                        if let image = model.passcodePreview {
+                        if !model.passcodeKeyTiles.isEmpty {
+                            LazyVGrid(columns: Array(repeating: GridItem(.fixed(44), spacing: 6), count: 3), spacing: 6) {
+                                ForEach(model.passcodeKeyTiles) { tile in
+                                    Group {
+                                        if let image = tile.image {
+                                            Image(nsImage: image)
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                        } else {
+                                            Circle()
+                                                .strokeBorder(.gray.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3]))
+                                                .overlay { Text(tile.key).font(.caption2).foregroundStyle(.gray) }
+                                        }
+                                    }
+                                    .frame(width: 44, height: 44)
+                                    .help(tile.image == nil ? "El tema no trae la tecla \(tile.key)" : "Tecla \(tile.key)")
+                                }
+                            }
+                            .padding(10)
+                            .background(
+                                model.passcodeVariant == .white ? Color.black.opacity(0.85) : Color.white,
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(.quaternary, lineWidth: 1)
+                            }
+                        } else if let image = model.passcodePreview {
                             Image(nsImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -189,21 +234,54 @@ struct ContentView: View {
                                 model.recolorPasscodePreview()
                             }
                             Picker("Caché", selection: $model.passcodeTargetVersion) {
-                                Text("TelephonyUI-10").tag("TelephonyUI-10")
-                                Text("TelephonyUI-9").tag("TelephonyUI-9")
-                                Text("TelephonyUI-8").tag("TelephonyUI-8")
+                                Text(model.passcodeAutoCacheLabel).tag(PasscodeCache.auto)
+                                ForEach(PasscodeCache.versions, id: \.self) { version in
+                                    Text(version).tag(version)
+                                }
                             }
-                            .frame(width: 170)
+                            .frame(width: 230)
                             .onChange(of: model.passcodeTargetVersion) { _, _ in
                                 model.recolorPasscodePreview()
                             }
                         }
-                        Text("Elige el sufijo que probará iOS: --white o --black. Las variantes -bold se generan automáticamente cuando corresponde.")
+                        HStack(spacing: 14) {
+                            Picker("Idioma", selection: $model.passcodeLanguage) {
+                                ForEach(PasscodeLanguage.allCases) { language in
+                                    Text(language.label).tag(language)
+                                }
+                            }
+                            .frame(width: 250)
+                            .onChange(of: model.passcodeLanguage) { _, _ in
+                                model.recolorPasscodePreview()
+                            }
+                            Toggle("Texto en negrita", isOn: $model.passcodeBold)
+                                .onChange(of: model.passcodeBold) { _, _ in
+                                    model.recolorPasscodePreview()
+                                }
+                        }
+                        Text("Elige el sufijo que probará iOS (--white o --black) y el idioma del teclado del iPhone. Negrita añade -bold. Auto elige la caché según la versión de iOS.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Button("Aplicar color al teclado") { model.flashPasscodeTheme() }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(model.isBusy || model.devices.isEmpty || model.passcodeTheme == nil)
+                        if !model.passcodePlannedFiles.isEmpty {
+                            DisclosureGroup("\(model.passcodePlannedFiles.count) archivos a escribir en \(model.passcodeResolvedCache)") {
+                                ScrollView {
+                                    Text(model.passcodePlannedFiles.joined(separator: "\n"))
+                                        .font(.system(.caption, design: .monospaced))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
+                                .frame(height: 90)
+                            }
+                            .font(.caption)
+                        }
+                        HStack {
+                            Button("Aplicar color al teclado") { model.flashPasscodeTheme() }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(model.isBusy || model.devices.isEmpty || model.passcodeTheme == nil)
+                            Button("Descargar .passthm…") { model.exportPasscodeTheme() }
+                                .disabled(model.isBusy || model.passcodeTheme == nil)
+                                .help("Guarda las teclas recoloreadas con los nombres exactos que se escribirán.")
+                        }
                     }
                 }
             }

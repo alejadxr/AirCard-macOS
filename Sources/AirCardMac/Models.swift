@@ -100,6 +100,48 @@ enum PasscodeVariant: String, CaseIterable, Hashable, Identifiable, Sendable {
     }
 }
 
+enum PasscodeLanguage: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case english
+    case russian
+    case ukrainian
+    case japanese
+    case universal
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .english: return "English"
+        case .russian: return "Russian (Русский)"
+        case .ukrainian: return "Ukrainian (Українська)"
+        case .japanese: return "Japanese (日本語)"
+        case .universal: return "Universal (todos)"
+        }
+    }
+}
+
+enum PasscodeCache {
+    static let auto = "Auto"
+    static let versions = ["TelephonyUI-10", "TelephonyUI-9", "TelephonyUI-8"]
+
+    static func resolve(_ selection: String, device: DeviceInfo?) -> String {
+        guard selection == auto else { return selection }
+        guard let major = device?.majorVersion else { return "TelephonyUI-10" }
+        switch major {
+        case 18...: return "TelephonyUI-10"
+        case 16...17: return "TelephonyUI-9"
+        default: return "TelephonyUI-8"
+        }
+    }
+}
+
+struct PasscodeKeyPreview: Identifiable, Sendable {
+    static let keypadOrder = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"]
+
+    let key: String
+    let png: Data
+    var id: String { key }
+}
+
 struct PasscodeAsset: Sendable {
     let name: String
     let data: Data
@@ -113,7 +155,9 @@ struct PasscodeTheme: Sendable {
     let unversionedAssets: [PasscodeAsset]
 
     func assets(for version: String) -> [PasscodeAsset] {
-        assetsByVersion[version] ?? unversionedAssets
+        if let assets = assetsByVersion[version] { return assets }
+        if !unversionedAssets.isEmpty { return unversionedAssets }
+        return assetsByVersion[detectedVersion] ?? []
     }
 
     var previewAsset: PasscodeAsset? {
@@ -142,6 +186,7 @@ enum AirCardError: LocalizedError {
     case invalidCardHash
     case invalidTarget(String)
     case processFailed(String)
+    case airTrafficUnavailable
     case cancelled
 
     var errorDescription: String? {
@@ -158,6 +203,8 @@ enum AirCardError: LocalizedError {
             return "Ruta de destino no permitida: \(target)"
         case .processFailed(let message):
             return message
+        case .airTrafficUnavailable:
+            return "Desbloquea el iPhone, mantén la pantalla encendida y abre Apple Books una vez."
         case .cancelled:
             return "Operación cancelada."
         }
