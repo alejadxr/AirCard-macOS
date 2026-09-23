@@ -58,6 +58,14 @@ struct ContentView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 280, height: 176)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(alignment: .bottom) {
+                                    Text("Así se escribirá · 1536 × 969")
+                                        .font(.caption2)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(.thinMaterial, in: Capsule())
+                                        .padding(6)
+                                }
                         } else {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(.quaternary)
@@ -72,22 +80,12 @@ struct ContentView: View {
                         .foregroundStyle(model.isCardHashValid ? Color.accentColor : .secondary)
                         .lineLimit(1)
                     }
-                    .overlay(alignment: .bottom) {
-                        if model.artwork != nil {
-                            Text("Así se escribirá · 1536 × 969")
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.thinMaterial, in: Capsule())
-                                .padding(6)
-                        }
-                    }
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Button("Elegir imagen…") { model.chooseArtwork() }
                             Button("Descargar assets…") { model.exportArtwork() }
                                 .disabled(model.isBusy || model.artwork == nil)
-                                .help("Guarda los 11 archivos (PNG 3x/2x y PDF) que se escriben en la tarjeta.")
+                                .help("Guarda la imagen original y los 11 archivos (PNG 3x/2x y PDF) que se escriben en la tarjeta.")
                         }
                         Text(model.imageName.isEmpty ? "PNG, JPG o WebP" : model.imageName)
                             .font(.caption)
@@ -146,6 +144,9 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("Se escriben las variantes canónicas 3x, 2x y PDF que usan Wallet: cardBackgroundCombined, diffuse, background y strip. No necesitas un .passthm.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("No se puede leer ni respaldar el artwork actual de la tarjeta desde el iPhone. Para volver al diseño original, quita la tarjeta de Wallet y vuelve a añadirla.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("Antes de aplicar: iPhone desbloqueado y Apple Books abierto al menos una vez.")

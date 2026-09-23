@@ -346,7 +346,16 @@ final class AppModel: ObservableObject {
             for (name, data) in files {
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
             }
-            status = "Artwork exportado: \(folder.lastPathComponent) (\(files.count) archivos)."
+            var count = files.count
+            if let source = artworkSourceURL {
+                let original = folder.appendingPathComponent("original-\(source.lastPathComponent)")
+                if FileManager.default.fileExists(atPath: original.path) {
+                    try FileManager.default.removeItem(at: original)
+                }
+                try FileManager.default.copyItem(at: source, to: original)
+                count += 1
+            }
+            status = "Artwork exportado: \(folder.lastPathComponent) (\(count) archivos)."
             log("Artwork exportado en \(folder.path)")
             NSWorkspace.shared.activateFileViewerSelecting([folder])
         } catch {
