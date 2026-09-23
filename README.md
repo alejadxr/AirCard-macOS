@@ -5,8 +5,9 @@ de [AirCard-Windows](https://github.com/Lumid-Off/AirCard-Windows). La interfaz
 y la orquestación están escritas en Swift 6.2 y usan Swift Concurrency para la
 detección del iPhone, preparación de imágenes y escritura atómica.
 
-> Estado: probado con un iPhone18,3 en iOS 27.2 (build 24B5084k). El proyecto
-> usa APIs privadas de Apple y es experimental; no es una herramienta oficial.
+> Estado: probado con un iPhone18,3 en iOS 27.2 (build 24B5084k). La detección
+> de hash de tarjetas también soporta iOS 18 (incluido 18.7.8). El proyecto usa
+> APIs privadas de Apple y es experimental; no es una herramienta oficial.
 
 ## Ejecutar
 
@@ -38,9 +39,11 @@ El DMG contiene la aplicación universal `AirCardMac.app` para Apple Silicon e
 Intel.
 
 Conecta un iPhone emparejado por USB, desbloquéalo y pulsa “Confiar”. Abre
-Apple Books una vez antes del primer flash. Pulsa “Escanear desde Wallet”, abre
-Apple Wallet y toca la tarjeta; el hash se rellenará solo. También puedes pegar
-el hash manualmente. Después elige una imagen, añade uno o varios overlays PNG
+Apple Books una vez antes del primer flash. Pulsa “Detectar desde Wallet”, abre
+Apple Wallet y toca la tarjeta: aparece en la lista, se vincula sola (con
+“Seguir la última tarjeta que abra” activo) y queda guardada para la próxima
+vez. Puedes renombrar, copiar u olvidar cada tarjeta desde su menú, o pegar el
+hash manualmente en “Pegar hash manualmente”. Después elige una imagen, añade uno o varios overlays PNG
 transparentes si quieres, y pulsa “Aplicar skin”. Los overlays se combinan en
 el orden mostrado y se incluyen en todas las variantes que recibe Wallet. Al
 terminar, cierra y abre Wallet en el iPhone.
@@ -53,6 +56,11 @@ se intentan invalidar sus cachés.
 
 - Port funcional inicial de Wallet card skin.
 - Detección nativa de iPhones emparejados.
+- Detección de hash desde syslog compatible con iOS 18 (registros separados por
+  NUL, líneas partidas entre lecturas, rutas `Passes/Cards/…`, `uniqueID = …`)
+  y filtro de falsos positivos (UUID, assets del sistema, hashes de prueba).
+- Lista persistente de tarjetas detectadas con nombre, última vez vista y
+  selección con un clic.
 - Preparación a 1536×969 y 1024×646 PNG, más PDF, conservando los bordes de la imagen.
 - Overlays PNG múltiples con transparencia, reordenamiento y previsualización antes del flash.
 - Flash por batch y limpieza/restauración de Books.

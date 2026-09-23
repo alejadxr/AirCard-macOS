@@ -22,12 +22,37 @@ final class AppModel: ObservableObject {
     @Published var logs: [String] = []
     @Published var isBusy = false
     @Published var isScanning = false
+    @Published var cards: [WalletCard] = CardStore.load()
+    @Published var followLatestCard = true
+    @Published var scanLineCount = 0
+    @Published var walletEventCount = 0
+    @Published var lastDetectedHash: String?
 
     private let service = WalletSkinService()
     private var artworkSourceURL: URL?
     private var currentTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
     private var passcodePreviewTask: Task<Void, Never>?
+    private var lastFocusDetection: Date?
+    private var rawLineCount = 0
+
+    var selectedDevice: DeviceInfo? {
+        devices.first { $0.id == selectedDeviceID }
+    }
+
+    var selectedCard: WalletCard? {
+        guard let hash = service.validateCardHash(cardHash) else { return nil }
+        return cards.first { $0.hash == hash }
+    }
+
+    var isCardHashValid: Bool {
+        service.validateCardHash(cardHash) != nil
+    }
+
+    var targetCardLabel: String {
+        if let card = selectedCard { return card.name }
+        return isCardHashValid ? "tarjeta manual" : "sin tarjeta"
+    }
 
     init() {
         refreshDevices()
@@ -347,17 +372,17 @@ final class AppModel: ObservableObject {
         do {
             let helper = try NativeTools.helperURL(named: "device_helper")
             isScanning = true
-            status = "Abre Wallet y toca la tarjeta para detectarla…"
-            log("Escuchando syslog de \(device.name).")
+            scanLineCount = 0
+            rawLineCount = 0
+            walletEventCount = 0
+            lastFocusDetection = nil
+            status = "Abre Wallet en el iPhone y toca la tarjeta que quieres personalizar…"
+            log("Escuchando syslog de \(device.name) (\(device.compatibilityNote)).")
             scanTask = Task { [weak self] in
                 do {
                     for try await line in DeviceLogScanner.lines(helper: helper, udid: device.id) {
                         guard !Task.isCancelled else { return }
-                        if let hash = WalletSkinService().extractCardHash(from: line) {
-                            self?.cardHash = hash
-                            self?.status = "Tarjeta detectada: \(hash)"
-                            self?.log("Hash detectado automáticamente.")
-                        }
+                        self?.handleSyslog(line: line)
                     }
                 } catch is CancellationError {
                     // User stopped the scanner.
@@ -370,6 +395,91 @@ final class AppModel: ObservableObject {
         } catch {
             status = error.localizedDescription
         }
+    }
+
+    private func handleSyslog(line: String) {
+        rawLineCount += 1
+        if rawLineCount % 50 == 0 { scanLineCount = rawLineCount }
+        guard let detection = CardHashDetector.detect(in: line) else {
+
+            if let name = CardHashDetector.walletName(in: line),
+               let hash = lastDetectedHash,
+               let index = cards.firstIndex(where: { $0.hash == hash }),
+               cards[index].name.hasPrefix("Tarjeta "),
+               Date.now.timeIntervalSince(cards[index].lastSeen) < 2 {
+                cards[index].name = name
+                CardStore.save(cards)
+            }
+            return
+        }
+        walletEventCount += 1
+        let now = Date.now
+        let isNew: Bool
+        if let index = cards.firstIndex(where: { $0.hash == detection.hash }) {
+            isNew = false
+            cards[index].lastSeen = now
+            cards[index].hits += 1
+            if let name = detection.name, cards[index].name.hasPrefix("Tarjeta ") {
+                cards[index].name = name
+            }
+        } else {
+            isNew = true
+            cards.append(WalletCard(
+                hash: detection.hash,
+                name: detection.name ?? "Tarjeta \(cards.count + 1)",
+                firstSeen: now,
+                lastSeen: now,
+                hits: 1
+            ))
+        }
+        CardStore.save(cards)
+        lastDetectedHash = detection.hash
+
+        let focusIsRecent = lastFocusDetection.map { now.timeIntervalSince($0) < 3 } ?? false
+        if detection.isFocus { lastFocusDetection = now }
+        let shouldSelect = (followLatestCard && (detection.isFocus || !focusIsRecent))
+            || service.validateCardHash(cardHash) == nil
+        if shouldSelect, cardHash != detection.hash {
+            cardHash = detection.hash
+            let name = cards.first { $0.hash == detection.hash }?.name ?? detection.hash
+            status = "Tarjeta vinculada: \(name). Elige la imagen y pulsa ‘Aplicar skin’."
+        }
+        if isNew {
+            log("Tarjeta detectada: \(detection.name ?? detection.hash) [\(detection.hash)]")
+        }
+    }
+
+    func selectCard(_ card: WalletCard) {
+        cardHash = card.hash
+        followLatestCard = false
+        status = "Tarjeta seleccionada: \(card.name)."
+    }
+
+    func renameCard(_ card: WalletCard, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = cards.firstIndex(where: { $0.hash == card.hash }) else { return }
+        cards[index].name = trimmed
+        CardStore.save(cards)
+    }
+
+    func forgetCard(_ card: WalletCard) {
+        cards.removeAll { $0.hash == card.hash }
+        CardStore.save(cards)
+        if service.validateCardHash(cardHash) == card.hash { cardHash = "" }
+        log("Tarjeta olvidada: \(card.name)")
+    }
+
+    func saveManualCard() {
+        guard let hash = service.validateCardHash(cardHash) else {
+            status = "El hash pegado no es válido."
+            return
+        }
+        cardHash = hash
+        if !cards.contains(where: { $0.hash == hash }) {
+            cards.append(WalletCard(hash: hash, name: "Tarjeta \(cards.count + 1)", firstSeen: .now, lastSeen: .now, hits: 0))
+            CardStore.save(cards)
+        }
+        status = "Hash guardado en la lista de tarjetas."
     }
 
     func cancel() {
