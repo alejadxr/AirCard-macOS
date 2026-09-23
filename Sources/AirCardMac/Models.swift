@@ -60,18 +60,6 @@ enum CardStore {
     }
 }
 
-struct ArtworkOverlay: Identifiable, Sendable, Hashable {
-    let id: UUID
-    let name: String
-    let data: Data
-
-    init(id: UUID = UUID(), name: String, data: Data) {
-        self.id = id
-        self.name = name
-        self.data = data
-    }
-}
-
 struct PreparedArtwork: Sendable {
     let png: Data
     let png2x: Data

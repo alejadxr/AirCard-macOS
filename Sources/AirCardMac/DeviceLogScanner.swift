@@ -1,8 +1,32 @@
 @preconcurrency import Foundation
 
 enum DeviceLogScanner {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var active: [ObjectIdentifier: ProcessTerminationController] = [:]
+
+    static func terminateAll() {
+        lock.lock()
+        let controllers = Array(active.values)
+        active.removeAll()
+        lock.unlock()
+        controllers.forEach { $0.terminate() }
+    }
+
+    private static func register(_ controller: ProcessTerminationController) {
+        lock.lock()
+        active[ObjectIdentifier(controller)] = controller
+        lock.unlock()
+    }
+
+    private static func unregister(_ controller: ProcessTerminationController) {
+        lock.lock()
+        active[ObjectIdentifier(controller)] = nil
+        lock.unlock()
+    }
+
     static func lines(helper: URL, udid: String) -> AsyncThrowingStream<String, Error> {
         let controller = ProcessTerminationController()
+        register(controller)
         let stream = AsyncThrowingStream<String, Error> { continuation in
             let worker = Task.detached(priority: .userInitiated) {
                 let process = Process()
@@ -50,6 +74,7 @@ enum DeviceLogScanner {
             }
 
             continuation.onTermination = { @Sendable _ in
+                unregister(controller)
                 controller.terminate()
                 worker.cancel()
             }
