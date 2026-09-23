@@ -69,6 +69,32 @@ se intentan invalidar sus cachés.
 - Icono de aplicación multicapa `AirCardIcon.icon`, compilado por Xcode 26.2 a `Assets.car` y `AirCardIcon.icns` para el bundle Swift Package.
 - Recoloración y flash de temas `.passthm` para TelephonyUI-8/9/10.
 - Generación de variantes de teclado `--white`, `--black`, `--white-bold` y `--black-bold`.
+- Nombres de teclas por idioma (`<idioma>-<dígito>-<letras>--white.png`) para
+  English, Russian, Ukrainian, Japanese o Universal, casilla “Texto en negrita”
+  y marcador `_big` que necesitan iOS 16–18.
+- Caché “Auto”: iOS 18+ → `TelephonyUI-10`, iOS 16–17 → `TelephonyUI-9`,
+  anteriores → `TelephonyUI-8`.
+- Timeout de AirTraffic de `max(60, archivos × 2)` s; si el iPhone está
+  bloqueado falla con un mensaje claro en lugar de quedarse esperando.
+- Descarga de lo que se va a escribir: “Descargar assets…” (imagen original +
+  11 archivos de Wallet) y “Descargar .passthm…” (teclas recoloreadas con sus
+  nombres finales).
+
+## Limitaciones
+
+- **No se puede leer el artwork actual de una tarjeta.** AFC solo expone
+  `/var/mobile/Media`; la carpeta de Wallet (`/var/mobile/Library/Passes/Cards/…`)
+  queda fuera, y el enlace de AirTraffic solo sirve para escribir. Ya se probó
+  leer `pass.json` por ese enlace y las tarjetas Apple Pay no lo exponen
+  (ver `c8ce025`).
+- Por lo mismo, **no hay respaldo del diseño original de Apple/del emisor** ni
+  miniatura real de cada tarjeta. “Descargar assets…” guarda solo lo que tú
+  elegiste y lo que la app escribe.
+- Para volver al diseño original, quita la tarjeta de Wallet y vuelve a
+  añadirla; Wallet descarga de nuevo los assets del emisor.
+- Los efectos que se mueven con el giroscopio (brillo o degradados) los dibuja
+  iOS; no conocemos ningún asset del `.pkpass` que los active o configure. El
+  artwork que se escribe es una imagen estática.
 
 ## Sobre el color de los números
 

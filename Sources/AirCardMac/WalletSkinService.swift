@@ -56,19 +56,7 @@ struct WalletSkinService: Sendable {
         }
         try Task.checkCancellation()
 
-        let assets: [(String, Data)] = [
-            ("cardBackgroundCombined@3x.png", artwork.png),
-            ("diffuse@3x.png", artwork.png),
-            ("background@3x.png", artwork.png),
-            ("strip@3x.png", artwork.png),
-            ("cardBackgroundCombined@2x.png", artwork.png2x),
-            ("diffuse@2x.png", artwork.png2x),
-            ("background@2x.png", artwork.png2x),
-            ("strip@2x.png", artwork.png2x),
-            ("cardBackgroundCombined.pdf", artwork.pdf),
-            ("background.pdf", artwork.pdf),
-            ("strip.pdf", artwork.pdf)
-        ]
+        let assets = Self.artworkFiles(artwork)
         let cardTarget = "/var/mobile/Library/Passes/Cards/\(cardHash).pkpass"
         await progress("Escribiendo assets canónicos de Wallet (cardBackgroundCombined, diffuse, background y strip)…")
 
@@ -87,6 +75,8 @@ struct WalletSkinService: Sendable {
                 files: assets,
                 progress: progress
             )
+        } catch AirCardError.airTrafficUnavailable {
+            throw AirCardError.airTrafficUnavailable
         } catch {
             await progress("El lote de artwork falló; probando escritura individual…")
         }
@@ -135,6 +125,22 @@ struct WalletSkinService: Sendable {
         return FlashResult(cardHash: cardHash, artworkFiles: assets.count, cacheFiles: cacheWrites)
     }
 
+    static func artworkFiles(_ artwork: PreparedArtwork) -> [(String, Data)] {
+        [
+            ("cardBackgroundCombined@3x.png", artwork.png),
+            ("diffuse@3x.png", artwork.png),
+            ("background@3x.png", artwork.png),
+            ("strip@3x.png", artwork.png),
+            ("cardBackgroundCombined@2x.png", artwork.png2x),
+            ("diffuse@2x.png", artwork.png2x),
+            ("background@2x.png", artwork.png2x),
+            ("strip@2x.png", artwork.png2x),
+            ("cardBackgroundCombined.pdf", artwork.pdf),
+            ("background.pdf", artwork.pdf),
+            ("strip.pdf", artwork.pdf)
+        ]
+    }
+
     func writeFiles(
         device: DeviceInfo,
         target: String,
@@ -177,6 +183,8 @@ struct WalletSkinService: Sendable {
                 if succeeded { return true }
             } catch is CancellationError {
                 throw CancellationError()
+            } catch AirCardError.airTrafficUnavailable {
+                throw AirCardError.airTrafficUnavailable
             } catch {
                 lastError = error
             }
@@ -250,6 +258,9 @@ struct WalletSkinService: Sendable {
             arguments: ["finish-write", source, link, recovered, snapshotURL.path]
         )
         await progress("Cleanup: \(diagnostic(finish))")
+        if Self.isHandshakeFailure(atc) {
+            throw AirCardError.airTrafficUnavailable
+        }
         return atc["ok"] as? Bool == true && operationOK(finish)
     }
 
@@ -276,10 +287,11 @@ struct WalletSkinService: Sendable {
 
     private func nativeAirTraffic(arguments: [String]) async throws -> [String: Any] {
         let helper = try NativeTools.helperURL(named: "airtraffic_host")
+        let assetCount = (arguments.count - 1) / 2
         let result = try await ProcessRunner.run(
             executable: helper,
             arguments: arguments,
-            timeout: .seconds(120)
+            timeout: .seconds(max(60, assetCount * 2) + 15)
         )
         guard let object = try? NativeTools.jsonObject(from: result.stdoutString) as? [String: Any] else {
             let stdout = result.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -289,6 +301,11 @@ struct WalletSkinService: Sendable {
             )
         }
         return object
+    }
+
+    private static func isHandshakeFailure(_ result: [String: Any]) -> Bool {
+        guard result["ok"] as? Bool != true, let error = result["error"] as? String else { return false }
+        return ["timeout", "SyncAllowed not observed", "ReadyForSync not observed"].contains(error)
     }
 
     private func operationOK(_ result: [String: Any]) -> Bool {

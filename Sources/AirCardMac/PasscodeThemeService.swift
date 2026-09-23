@@ -4,8 +4,24 @@ import ImageIO
 import UniformTypeIdentifiers
 
 struct PasscodeThemeService: Sendable {
-    private static let telephonyVersions = ["TelephonyUI-10", "TelephonyUI-9", "TelephonyUI-8"]
+    private static let telephonyVersions = PasscodeCache.versions
     private static let imageExtensions = Set(["png", "jpg", "jpeg"])
+
+    private static let subtextsEN: [String: String] = [
+        "0": "+", "1": "", "2": "A B C", "3": "D E F", "4": "G H I",
+        "5": "J K L", "6": "M N O", "7": "P Q R S", "8": "T U V", "9": "W X Y Z"
+    ]
+    private static let subtextsRU: [String: String] = [
+        "0": "+", "1": "", "2": "А Б В Г", "3": "Д Е Ж З", "4": "И Й К Л",
+        "5": "М Н О П", "6": "Р С Т У", "7": "Ф Х Ц Ч", "8": "Ш Щ Ъ Ы", "9": "Ь Э Ю Я"
+    ]
+    private static let subtextsUK: [String: String] = [
+        "0": "+", "1": "", "2": "А Б В Г Ґ", "3": "Д Е Є Ж З", "4": "И І Ї Й",
+        "5": "К Л М Н", "6": "О П Р С", "7": "Т У Ф Х", "8": "Ц Ч Ш Щ", "9": "Ь Ю Я"
+    ]
+    private static let universalPrefixes = [
+        "en", "other", "ru", "uk", "ja", "es", "fr", "de", "it", "pt", "tr", "pl", "ko", "zh"
+    ]
 
     func load(url: URL) async throws -> PasscodeTheme {
         let work = try NativeTools.temporaryDirectory(prefix: "aircard-passthm")
@@ -17,7 +33,7 @@ struct PasscodeThemeService: Sendable {
             timeout: .seconds(30)
         )
         guard result.status == 0 else {
-            throw AirCardError.processFailed("No pude abrir el paquete .passthm: (result.stderrString.trimmingCharacters(in: .whitespacesAndNewlines))")
+            throw AirCardError.processFailed("No pude abrir el paquete .passthm: \(result.stderrString.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
 
         let files = (FileManager.default.enumerator(
@@ -75,28 +91,107 @@ struct PasscodeThemeService: Sendable {
         return try Self.recolor(asset.data, tint: color)
     }
 
+    func keyPreviews(theme: PasscodeTheme, color: PasscodeTint, targetVersion: String) throws -> [PasscodeKeyPreview] {
+        var byKey: [String: PasscodeAsset] = [:]
+        for asset in theme.assets(for: targetVersion) where asset.isImage {
+            guard let key = Self.keypadKey(for: asset.name)?.digit, byKey[key] == nil else { continue }
+            byKey[key] = asset
+        }
+        return try PasscodeKeyPreview.keypadOrder.compactMap { key in
+            guard let asset = byKey[key] else { return nil }
+            return PasscodeKeyPreview(key: key, png: try Self.recolor(asset.data, tint: color))
+        }
+    }
+
+    func plannedFileNames(
+        theme: PasscodeTheme,
+        variant: PasscodeVariant,
+        language: PasscodeLanguage,
+        bold: Bool,
+        targetVersion: String
+    ) -> [String] {
+        var names: Set<String> = ["_big"]
+        for asset in theme.assets(for: targetVersion) {
+            if asset.isImage {
+                names.formUnion(Self.outputNames(for: asset.name, variant: variant, language: language, bold: bold))
+            } else {
+                names.insert(asset.name)
+            }
+        }
+        return names.sorted()
+    }
+
+    func preparedFiles(
+        theme: PasscodeTheme,
+        color: PasscodeTint,
+        variant: PasscodeVariant,
+        language: PasscodeLanguage,
+        bold: Bool,
+        targetVersion: String
+    ) async throws -> [(String, Data)] {
+        let selectedAssets = theme.assets(for: targetVersion)
+        guard !selectedAssets.isEmpty else {
+            throw AirCardError.processFailed("El tema no tiene assets para \(targetVersion).")
+        }
+        let files = try await Task.detached(priority: .userInitiated) {
+            try Self.recoloredFiles(
+                selectedAssets,
+                tint: color,
+                variant: variant,
+                language: language,
+                bold: bold
+            )
+        }.value
+        guard !files.isEmpty else {
+            throw AirCardError.processFailed("No encontré imágenes válidas para recolorear.")
+        }
+        return files
+    }
+
+    func export(files: [(String, Data)], targetVersion: String, to destination: URL) async throws {
+        let work = try NativeTools.temporaryDirectory(prefix: "aircard-export")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let folder = work.appendingPathComponent(targetVersion, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for (name, data) in files {
+            try data.write(to: folder.appendingPathComponent(name), options: .atomic)
+        }
+        let archive = work.appendingPathComponent("theme.zip")
+        let result = try await ProcessRunner.run(
+            executable: URL(fileURLWithPath: "/usr/bin/ditto"),
+            arguments: ["-c", "-k", "--norsrc", "--keepParent", folder.path, archive.path],
+            timeout: .seconds(60)
+        )
+        guard result.status == 0 else {
+            throw AirCardError.processFailed("No pude crear el .passthm: \(result.stderrString.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: archive, to: destination)
+    }
+
     func flash(
         theme: PasscodeTheme,
         device: DeviceInfo,
         color: PasscodeTint,
         variant: PasscodeVariant,
+        language: PasscodeLanguage,
+        bold: Bool,
         targetVersion: String,
         progress: @escaping @Sendable (String) async -> Void
     ) async throws -> PasscodeFlashResult {
         try Task.checkCancellation()
-        let selectedAssets = theme.assets(for: targetVersion)
-        guard !selectedAssets.isEmpty else {
-            throw AirCardError.processFailed("El tema no tiene assets para (targetVersion).")
-        }
-
-        await progress("Preparando variante --\(variant.rawValue) con glifos \(Self.hex(color))…")
-        let files = try await Task.detached(priority: .userInitiated) {
-            try Self.recoloredFiles(selectedAssets, tint: color, variant: variant)
-        }.value
-
-        guard !files.isEmpty else {
-            throw AirCardError.processFailed("No encontré imágenes válidas para recolorear.")
-        }
+        let boldText = bold ? "-bold" : ""
+        await progress("Preparando variante --\(variant.rawValue)\(boldText) (\(language.label)) con glifos \(Self.hex(color))…")
+        let files = try await preparedFiles(
+            theme: theme,
+            color: color,
+            variant: variant,
+            language: language,
+            bold: bold,
+            targetVersion: targetVersion
+        )
 
         let target = "/var/mobile/Library/Caches/\(targetVersion)"
         let writer = WalletSkinService()
@@ -107,14 +202,14 @@ struct PasscodeThemeService: Sendable {
             try Task.checkCancellation()
             let end = min(start + chunkSize, files.count)
             let chunk = Array(files[start..<end])
-            await progress("Escribiendo teclas (end)/(files.count) en (targetVersion)…")
+            await progress("Escribiendo teclas \(end)/\(files.count) en \(targetVersion)…")
             guard try await writer.writeFiles(
                 device: device,
                 target: target,
                 files: chunk,
                 progress: progress
             ) else {
-                throw AirCardError.processFailed("No se pudieron escribir las teclas en la caché de (targetVersion).")
+                throw AirCardError.processFailed("No se pudieron escribir las teclas en la caché de \(targetVersion).")
             }
             written += chunk.count
             start = end
@@ -127,7 +222,9 @@ struct PasscodeThemeService: Sendable {
     private static func recoloredFiles(
         _ assets: [PasscodeAsset],
         tint: PasscodeTint,
-        variant: PasscodeVariant
+        variant: PasscodeVariant,
+        language: PasscodeLanguage,
+        bold: Bool
     ) throws -> [(String, Data)] {
         var output: [String: Data] = [:]
         for asset in assets {
@@ -135,17 +232,104 @@ struct PasscodeThemeService: Sendable {
                 output[asset.name] = asset.data
                 continue
             }
-            let outputName = imageNameAsPNG(asset.name)
             let tinted = try recolor(asset.data, tint: tint)
-            output[outputName] = tinted
-
-            // iOS TelephonyUI uses the suffix as part of the cache key. Write
-            // the variant selected in the UI, including its bold form.
-            output[selectedVariantName(outputName, variant: variant)] = tinted
+            for name in outputNames(for: asset.name, variant: variant, language: language, bold: bold) {
+                output[name] = tinted
+            }
         }
+
+        output["_big"] = Data()
         return output
             .sorted { $0.key < $1.key }
             .map { ($0.key, $0.value) }
+    }
+
+    private static func outputNames(
+        for name: String,
+        variant: PasscodeVariant,
+        language: PasscodeLanguage,
+        bold: Bool
+    ) -> [String] {
+        let outputName = imageNameAsPNG(name)
+        return [outputName, selectedVariantName(outputName, variant: variant)]
+            + keypadNames(for: outputName, language: language, variant: variant, bold: bold)
+    }
+
+    static func keypadNames(
+        for name: String,
+        language: PasscodeLanguage,
+        variant: PasscodeVariant,
+        bold: Bool
+    ) -> [String] {
+        guard !name.hasPrefix("_"), !name.hasPrefix("."),
+              let key = keypadKey(for: name) else { return [] }
+        let digit = key.digit
+        let suffix = "--\(variant.rawValue)\(bold ? "-bold" : "")"
+        var names = Set<String>()
+
+        func add(_ prefix: String, _ subtext: String) {
+            names.insert("\(prefix)-\(digit)-\(subtext)\(suffix).png")
+            let compact = subtext.replacingOccurrences(of: " ", with: "")
+            if compact != subtext {
+                names.insert("\(prefix)-\(digit)-\(compact)\(suffix).png")
+            }
+        }
+        func addWithLetters(_ prefixes: [String], _ tables: [[String: String]]) {
+            for prefix in prefixes {
+                add(prefix, "")
+                for table in tables {
+                    if let letters = table[digit], !letters.isEmpty { add(prefix, letters) }
+                }
+            }
+        }
+
+        switch language {
+        case .english:
+            addWithLetters(["en", "other"], [subtextsEN])
+        case .russian:
+            addWithLetters(["ru", "other", "en"], [subtextsRU, subtextsEN])
+        case .ukrainian:
+            addWithLetters(["uk", "other", "en"], [subtextsUK, subtextsEN])
+        case .japanese:
+            addWithLetters(["ja", "other", "en"], [subtextsEN])
+        case .universal:
+            for prefix in universalPrefixes {
+                let local = prefix == "ru" ? subtextsRU : prefix == "uk" ? subtextsUK : [:]
+                addWithLetters([prefix], [local, subtextsEN])
+            }
+        }
+
+        if let subtext = key.subtext, !subtext.isEmpty {
+            for prefix in ["en", "other", "ru", "uk", "ja"] { add(prefix, subtext) }
+        }
+        return names.sorted()
+    }
+
+    private static func keypadKey(for name: String) -> (digit: String, subtext: String?)? {
+        let stem = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
+        let clean = stem.replacingOccurrences(
+            of: #"--?(white|black)(-bold)?$"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        if let match = firstMatch(#"(?:^[a-zA-Z]+-)?([0-9*#])(?:-([^-\n]+))?"#, in: clean),
+           let digit = match[1] {
+            return (digit, match[2]?.trimmingCharacters(in: .whitespaces))
+        }
+        if let match = firstMatch(#"([0-9*#])"#, in: name), let digit = match[1] {
+            return (digit, nil)
+        }
+        return nil
+    }
+
+    private static func firstMatch(_ pattern: String, in text: String) -> [String?]? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else {
+            return nil
+        }
+        return (0..<match.numberOfRanges).map { index in
+            Range(match.range(at: index), in: text).map { String(text[$0]) }
+        }
     }
 
     private static func selectedVariantName(_ name: String, variant: PasscodeVariant) -> String {
@@ -187,8 +371,6 @@ struct PasscodeThemeService: Sendable {
         context.draw(image, in: rect)
 
         if containsTransparency(context: context, width: image.width, height: image.height) {
-            // Transparent keypad assets are already masks for the glyph/artwork.
-            // Tint the visible pixels while preserving their alpha edges.
             context.setBlendMode(.sourceIn)
             context.setFillColor(red: tint.red, green: tint.green, blue: tint.blue, alpha: 1)
             context.fill(rect)

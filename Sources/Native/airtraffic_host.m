@@ -96,9 +96,13 @@ int main(int argc, const char *argv[]) {
             return 64;
         }
 
+        // Same budget as the Windows client: 2 s per asset, at least 60 s.
+        // A locked iPhone never sends SyncAllowed, so fail fast instead of
+        // hanging for minutes.
+        unsigned int timeoutSeconds = (unsigned int)MAX(60, pairCount * 2);
         signal(SIGPIPE, SIG_IGN);
         signal(SIGALRM, TimeoutHandler);
-        alarm(300);
+        alarm(timeoutSeconds);
         ATHostConnectionRef connection =
             ATHostConnectionCreate((__bridge CFStringRef)deviceIdentifier);
         if (!connection) {
