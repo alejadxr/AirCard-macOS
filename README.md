@@ -52,6 +52,35 @@ El flujo conserva/restaura los archivos temporales de Books y limpia los
 artefactos generados. Solo se escriben los assets de la tarjeta seleccionada y
 se intentan invalidar sus cachés.
 
+## Estudio de tarjeta
+
+La app se organiza con un menú lateral: iPhone, Estudio de tarjeta, Teclado de
+código, las tarjetas detectadas y Actividad.
+
+El estudio trabaja con un documento de capas (`.aircardskin`) que se renderiza
+con Core Image y shaders Metal compilados en tiempo de ejecución (no hace falta
+Xcode ni el Metal Toolchain). La misma función genera la previsualización y los
+archivos que se escriben en Wallet.
+
+- Capas: imagen, color, degradado lineal/radial/cónico, mesh gradient,
+  holográfico, metal cepillado, brillo, grano, patrón (líneas, puntos,
+  cuadrícula, fibra de carbono, guilloché, ondas) y texto.
+- Cada capa tiene opacidad y modo de mezcla (multiplicar, trama, superponer,
+  luz suave, sobreexponer, etc.). Ajustes globales de color, viñeta, bloom,
+  desenfoque y nitidez.
+- Estilos listos: Titanio, Holo, Aurora, Carbono, Guilloché, Vidrio,
+  Atardecer y Noir. Los que usan foto conservan la tuya.
+- Arrastra la tarjeta para inclinarla y ver cómo se mueven los reflejos. Como
+  Wallet recibe una imagen fija, la “Inclinación” decide en qué ángulo quedan
+  congelados al exportar.
+- “Zonas de Wallet” marca la franja aproximada que se ve en la pila de tarjetas.
+- Deshacer/rehacer, guardar/abrir `.aircardskin`, arrastrar imágenes al lienzo.
+- Cada skin aplicado se guarda en
+  `~/Library/Application Support/AirCard/Cards/<hash>/` con miniatura, los 11
+  archivos, el `.aircardskin` y las imágenes originales. La barra lateral muestra
+  esa miniatura y la vista de cada tarjeta permite “Guardar respaldo…” o
+  reabrir el diseño.
+
 ## Alcance actual
 
 - Port funcional inicial de Wallet card skin.

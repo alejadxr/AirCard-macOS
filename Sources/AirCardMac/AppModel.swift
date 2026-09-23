@@ -15,10 +15,8 @@ final class AppModel: ObservableObject {
     @Published var devices: [DeviceInfo] = []
     @Published var selectedDeviceID = ""
     @Published var cardHash = ""
-    @Published var artwork: PreparedArtwork?
-    @Published var artworkPreview: NSImage?
-    @Published var imageName = ""
-    @Published var overlays: [ArtworkOverlay] = []
+    @Published var cardThumbnails: [String: NSImage] = [:]
+    @Published var historyRevision = 0
     @Published var passcodeTheme: PasscodeTheme?
     @Published var passcodePreview: NSImage?
     @Published var passcodeKeyTiles: [PasscodeKeyTile] = []
@@ -38,8 +36,8 @@ final class AppModel: ObservableObject {
     @Published var walletEventCount = 0
     @Published var lastDetectedHash: String?
 
+    let studio = StudioModel()
     private let service = WalletSkinService()
-    private var artworkSourceURL: URL?
     private var currentTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
     private var passcodePreviewTask: Task<Void, Never>?
@@ -65,7 +63,72 @@ final class AppModel: ObservableObject {
     }
 
     init() {
+        reloadThumbnails()
         refreshDevices()
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            DeviceLogScanner.terminateAll()
+        }
+    }
+
+    func reloadThumbnails() {
+        var thumbnails: [String: NSImage] = [:]
+        for card in cards {
+            if let image = CardHistoryStore.thumbnail(for: card.hash) { thumbnails[card.hash] = image }
+        }
+        cardThumbnails = thumbnails
+        historyRevision += 1
+    }
+
+    func history(for card: WalletCard) -> [CardHistoryEntry] {
+        CardHistoryStore.entries(for: card.hash)
+    }
+
+    func exportBackup(_ entry: CardHistoryEntry, card: WalletCard) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Guardar respaldo aquí"
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+        let destination = directory.appendingPathComponent(
+            "\(card.name)-\(entry.url.lastPathComponent)",
+            isDirectory: true
+        )
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: entry.url, to: destination)
+            status = "Respaldo guardado: \(destination.lastPathComponent)."
+            log("Respaldo de \(card.name) guardado en \(destination.path)")
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+        } catch {
+            status = error.localizedDescription
+            log("No pude guardar el respaldo: \(error.localizedDescription)")
+        }
+    }
+
+    func openInStudio(_ entry: CardHistoryEntry) {
+        studio.load(url: entry.skinURL)
+    }
+
+    func exportStudioAssets() {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                guard let folder = try await studio.exportAssets() else { return }
+                status = "Assets exportados en \(folder.lastPathComponent)."
+                log("Assets del estudio exportados en \(folder.path)")
+                NSWorkspace.shared.activateFileViewerSelecting([folder])
+            } catch {
+                status = error.localizedDescription
+                log("No pude exportar los assets: \(error.localizedDescription)")
+            }
+        }
     }
 
     func refreshDevices() {
@@ -89,113 +152,6 @@ final class AppModel: ObservableObject {
                 self?.status = error.localizedDescription
                 self?.log("Error de detección: \(error.localizedDescription)")
             }
-        }
-    }
-
-    func chooseArtwork() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .jpeg, .webP, .image]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        isBusy = true
-        status = "Preparando imagen a 1536 × 969…"
-        artworkSourceURL = url
-        currentTask?.cancel()
-        let overlaySnapshot = overlays
-        currentTask = Task { [weak self] in
-            do {
-                let prepared = try await Task.detached(priority: .userInitiated) {
-                    try ImageProcessor.prepare(url: url, overlays: overlaySnapshot)
-                }.value
-                guard !Task.isCancelled else { return }
-                self?.artwork = prepared
-                self?.artworkPreview = NSImage(data: prepared.png)
-                self?.imageName = url.lastPathComponent
-                let overlayText = overlaySnapshot.isEmpty
-                    ? "sin overlays"
-                    : "\(overlaySnapshot.count) overlay(s)"
-                self?.status = "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969, \(overlayText)."
-                self?.log("Artwork preparado: \(url.lastPathComponent) [\(overlayText)]")
-            } catch {
-                self?.status = error.localizedDescription
-                self?.log("No pude preparar la imagen: \(error.localizedDescription)")
-            }
-            self?.isBusy = false
-        }
-    }
-
-    func chooseOverlays() {
-        guard artworkSourceURL != nil else {
-            status = "Selecciona primero la imagen base de la tarjeta."
-            return
-        }
-
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png]
-        panel.allowsMultipleSelection = true
-        guard panel.runModal() == .OK else { return }
-
-        do {
-            let imported = try panel.urls.map { url in
-                let data = try Data(contentsOf: url)
-                guard CGImageSourceCreateWithData(data as CFData, nil) != nil else {
-                    throw AirCardError.processFailed("No pude leer el PNG \(url.lastPathComponent).")
-                }
-                return ArtworkOverlay(name: url.lastPathComponent, data: data)
-            }
-            guard !imported.isEmpty else { return }
-            overlays.append(contentsOf: imported)
-            log("Overlays añadidos: \(imported.map(\.name).joined(separator: ", "))")
-            rebuildArtwork(status: "Aplicando \(overlays.count) overlay(s) PNG…")
-        } catch {
-            status = error.localizedDescription
-            log("No pude añadir el overlay: \(error.localizedDescription)")
-        }
-    }
-
-    func removeOverlay(_ overlay: ArtworkOverlay) {
-        overlays.removeAll { $0.id == overlay.id }
-        log("Overlay quitado: \(overlay.name)")
-        rebuildArtwork(status: overlays.isEmpty ? "Quitando overlays PNG…" : "Actualizando overlays PNG…")
-    }
-
-    func moveOverlayUp(_ overlay: ArtworkOverlay) {
-        guard let index = overlays.firstIndex(where: { $0.id == overlay.id }), index > 0 else { return }
-        overlays.swapAt(index, index - 1)
-        rebuildArtwork(status: "Reordenando overlays PNG…")
-    }
-
-    func moveOverlayDown(_ overlay: ArtworkOverlay) {
-        guard let index = overlays.firstIndex(where: { $0.id == overlay.id }), index + 1 < overlays.count else { return }
-        overlays.swapAt(index, index + 1)
-        rebuildArtwork(status: "Reordenando overlays PNG…")
-    }
-
-    private func rebuildArtwork(status message: String) {
-        guard let sourceURL = artworkSourceURL else { return }
-        currentTask?.cancel()
-        isBusy = true
-        status = message
-        let overlaySnapshot = overlays
-        currentTask = Task { [weak self] in
-            do {
-                let prepared = try await Task.detached(priority: .userInitiated) {
-                    try ImageProcessor.prepare(url: sourceURL, overlays: overlaySnapshot)
-                }.value
-                guard !Task.isCancelled else { return }
-                self?.artwork = prepared
-                self?.artworkPreview = NSImage(data: prepared.png)
-                self?.status = overlaySnapshot.isEmpty
-                    ? "Imagen lista: \(prepared.sourceWidth) × \(prepared.sourceHeight) → 1536 × 969."
-                    : "Artwork actualizado con \(overlaySnapshot.count) overlay(s) PNG."
-            } catch is CancellationError {
-                return
-            } catch {
-                self?.status = error.localizedDescription
-                self?.log("No pude actualizar los overlays: \(error.localizedDescription)")
-            }
-            self?.isBusy = false
         }
     }
 
@@ -323,47 +279,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func exportArtwork() {
-        guard let artwork else {
-            status = "Selecciona una imagen primero."
-            return
-        }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.prompt = "Guardar aquí"
-        guard panel.runModal() == .OK, let directory = panel.url else { return }
-
-        let baseName = URL(fileURLWithPath: imageName).deletingPathExtension().lastPathComponent
-        let folder = directory.appendingPathComponent(
-            "\(baseName.isEmpty ? "AirCard" : baseName)-wallet",
-            isDirectory: true
-        )
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let files = WalletSkinService.artworkFiles(artwork)
-            for (name, data) in files {
-                try data.write(to: folder.appendingPathComponent(name), options: .atomic)
-            }
-            var count = files.count
-            if let source = artworkSourceURL {
-                let original = folder.appendingPathComponent("original-\(source.lastPathComponent)")
-                if FileManager.default.fileExists(atPath: original.path) {
-                    try FileManager.default.removeItem(at: original)
-                }
-                try FileManager.default.copyItem(at: source, to: original)
-                count += 1
-            }
-            status = "Artwork exportado: \(folder.lastPathComponent) (\(count) archivos)."
-            log("Artwork exportado en \(folder.path)")
-            NSWorkspace.shared.activateFileViewerSelecting([folder])
-        } catch {
-            status = error.localizedDescription
-            log("No pude exportar el artwork: \(error.localizedDescription)")
-        }
-    }
-
     var passcodeResolvedCache: String {
         PasscodeCache.resolve(passcodeTargetVersion, device: selectedDevice)
     }
@@ -436,8 +351,8 @@ final class AppModel: ObservableObject {
             status = "Selecciona un iPhone conectado."
             return
         }
-        guard let artwork else {
-            status = "Selecciona una imagen primero."
+        guard studio.document.hasVisibleContent else {
+            status = "El diseño no tiene capas visibles."
             return
         }
         guard service.validateCardHash(cardHash) != nil else {
@@ -455,8 +370,12 @@ final class AppModel: ObservableObject {
             log("Escaneo detenido; esperando el cierre del helper nativo…")
         }
         let rawCardHash = cardHash
+        let document = studio.document
+        let studio = studio
         currentTask = Task { [weak self] in
             do {
+                self?.status = "Renderizando el diseño a 1536 × 969…"
+                let artwork = try await studio.renderArtwork()
                 if let scanToStop {
                     await scanToStop.value
                     try Task.checkCancellation()
@@ -474,6 +393,14 @@ final class AppModel: ObservableObject {
                     }
                 }
                 guard !Task.isCancelled else { return }
+                do {
+                    try await Task.detached(priority: .utility) {
+                        _ = try CardHistoryStore.save(hash: result.cardHash, document: document, artwork: artwork)
+                    }.value
+                    self?.reloadThumbnails()
+                } catch {
+                    self?.log("No pude guardar el historial local: \(error.localizedDescription)")
+                }
                 self?.status = "Skin aplicada a \(result.cardHash). Cierra y abre Wallet en el iPhone."
                 self?.log("Completado: \(result.artworkFiles) assets; \(result.cacheFiles) cachés tocadas.")
             } catch is CancellationError {
@@ -594,6 +521,8 @@ final class AppModel: ObservableObject {
     func forgetCard(_ card: WalletCard) {
         cards.removeAll { $0.hash == card.hash }
         CardStore.save(cards)
+        CardHistoryStore.removeAll(for: card.hash)
+        cardThumbnails[card.hash] = nil
         if service.validateCardHash(cardHash) == card.hash { cardHash = "" }
         log("Tarjeta olvidada: \(card.name)")
     }
