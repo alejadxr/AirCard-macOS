@@ -12,6 +12,52 @@ struct DeviceInfo: Identifiable, Hashable, Sendable {
         let buildText = build.isEmpty ? "" : " (\(build))"
         return "\(name) · \(product) · \(versionText)\(buildText)"
     }
+
+    var majorVersion: Int? {
+        version.split(separator: ".").first.flatMap { Int($0) }
+    }
+
+    var compatibilityNote: String {
+        guard let major = majorVersion else { return "Versión de iOS desconocida" }
+        switch major {
+        case 18: return "iOS \(version) · detección compatible (iOS 18)"
+        case 26...: return "iOS \(version) · detección compatible"
+        default: return "iOS \(version) · no probado; la detección puede fallar"
+        }
+    }
+
+    var isDetectionTested: Bool {
+        guard let major = majorVersion else { return false }
+        return major == 18 || major >= 26
+    }
+}
+
+struct WalletCard: Identifiable, Codable, Hashable, Sendable {
+    var id: String { hash }
+    let hash: String
+    var name: String
+    var firstSeen: Date
+    var lastSeen: Date
+    var hits: Int
+
+    var shortHash: String {
+        hash.count > 14 ? "\(hash.prefix(8))…\(hash.suffix(5))" : hash
+    }
+}
+
+enum CardStore {
+    private static let key = "AirCard.savedCards.v1"
+
+    static func load() -> [WalletCard] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let cards = try? JSONDecoder().decode([WalletCard].self, from: data) else { return [] }
+        return cards.filter { WalletSkinService().validateCardHash($0.hash) != nil }
+    }
+
+    static func save(_ cards: [WalletCard]) {
+        guard let data = try? JSONEncoder().encode(cards) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
 }
 
 struct ArtworkOverlay: Identifiable, Sendable, Hashable {

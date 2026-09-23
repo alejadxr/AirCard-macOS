@@ -15,14 +15,27 @@ enum DeviceLogScanner {
 
                 do {
                     try process.run()
+                    // syslog_relay on iOS 18 terminates records with NUL, and
+                    // a record can straddle two reads, so bytes are buffered
+                    // until a full line is available.
+                    var pending = Data()
                     while true {
                         try Task.checkCancellation()
                         let data = pipe.fileHandleForReading.availableData
                         if data.isEmpty { break }
-                        let text = String(decoding: data, as: UTF8.self)
-                        for line in text.split(whereSeparator: \.isNewline) {
-                            continuation.yield(String(line))
+                        pending.append(data)
+                        var lineStart = pending.startIndex
+                        for index in pending.indices where [0x0A, 0x0D, 0x00].contains(pending[index]) {
+                            if index > lineStart {
+                                continuation.yield(String(decoding: pending[lineStart..<index], as: UTF8.self))
+                            }
+                            lineStart = index + 1
                         }
+                        pending = Data(pending[lineStart...])
+                        if pending.count > 1 << 20 { pending.removeAll(keepingCapacity: true) }
+                    }
+                    if !pending.isEmpty {
+                        continuation.yield(String(decoding: pending, as: UTF8.self))
                     }
                     process.waitUntilExit()
                     if !Task.isCancelled && process.terminationStatus != 0 {

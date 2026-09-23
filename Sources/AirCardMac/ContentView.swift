@@ -5,12 +5,13 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AirCard macOS")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text("Wallet card skin · Swift Concurrency · v0.2.5")
+                        Text("Wallet card skin · Swift Concurrency · v0.3.0")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -19,40 +20,35 @@ struct ContentView: View {
             }
 
             GroupBox("1. iPhone") {
-                HStack {
-                    Picker("Dispositivo", selection: $model.selectedDeviceID) {
-                        Text("Seleccionar…").tag("")
-                        ForEach(model.devices) { device in
-                            Text(device.summary).tag(device.id)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Picker("Dispositivo", selection: $model.selectedDeviceID) {
+                            Text("Seleccionar…").tag("")
+                            ForEach(model.devices) { device in
+                                Text(device.summary).tag(device.id)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        if model.devices.isEmpty {
+                            Text("Sin dispositivo")
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    if model.devices.isEmpty {
-                        Text("Sin dispositivo")
-                            .foregroundStyle(.secondary)
+                    if let device = model.selectedDevice {
+                        Label(device.compatibilityNote, systemImage: device.isDetectionTested ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(device.isDetectionTested ? .green : .orange)
                     }
                 }
             }
 
             GroupBox("2. Tarjeta") {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextField("Hash de la tarjeta (Base64)", text: $model.cardHash)
-                        .textFieldStyle(.roundedBorder)
-                    HStack {
-                        Button(model.isScanning ? "Detener escaneo" : "Escanear desde Wallet") {
-                            model.toggleScan()
-                        }
-                        .disabled(model.devices.isEmpty || model.isBusy)
-                        Text("También puedes pegar el hash manualmente.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                CardPickerView(model: model)
             }
 
             GroupBox("3. Artwork") {
                 HStack(spacing: 16) {
-                    Group {
+                    VStack(spacing: 6) {
                         if let image = model.artworkPreview {
                             Image(nsImage: image)
                                 .resizable()
@@ -65,6 +61,13 @@ struct ContentView: View {
                                 .frame(width: 280, height: 176)
                                 .overlay { Text("Sin imagen") .foregroundStyle(.secondary) }
                         }
+                        Label(
+                            model.isCardHashValid ? "Para: \(model.targetCardLabel)" : "Aún no hay tarjeta vinculada",
+                            systemImage: model.isCardHashValid ? "link" : "link.badge.plus"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(model.isCardHashValid ? Color.accentColor : .secondary)
+                        .lineLimit(1)
                     }
                     VStack(alignment: .leading, spacing: 10) {
                         Button("Elegir imagen…") { model.chooseArtwork() }
@@ -135,11 +138,11 @@ struct ContentView: View {
             }
 
             HStack {
-                Button(model.isBusy ? "Cancelar" : "Aplicar skin") {
+                Button(model.isBusy ? "Cancelar" : "Aplicar skin a «\(model.targetCardLabel)»") {
                     model.isBusy ? model.cancel() : model.flashSkin()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!model.isBusy && (model.selectedDeviceID.isEmpty || model.cardHash.isEmpty || model.artwork == nil))
+                .disabled(!model.isBusy && (model.selectedDeviceID.isEmpty || !model.isCardHashValid || model.artwork == nil))
                 Text(model.status)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -216,6 +219,166 @@ struct ContentView: View {
             }
         }
         .padding(24)
-        .frame(minWidth: 760, minHeight: 680)
+        }
+        .frame(minWidth: 780, minHeight: 720)
+    }
+}
+
+private struct CardPickerView: View {
+    @ObservedObject var model: AppModel
+    @State private var renaming: WalletCard?
+    @State private var renameText = ""
+    @State private var showManualEntry = false
+
+    private var sortedCards: [WalletCard] {
+        model.cards.sorted { $0.lastSeen > $1.lastSeen }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Button {
+                    model.toggleScan()
+                } label: {
+                    Label(
+                        model.isScanning ? "Detener detección" : "Detectar desde Wallet",
+                        systemImage: model.isScanning ? "stop.circle.fill" : "wave.3.right.circle.fill"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(model.isScanning ? .red : .accentColor)
+                .disabled(model.devices.isEmpty || model.isBusy)
+
+                Toggle("Seguir la última tarjeta que abra", isOn: $model.followLatestCard)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                Spacer()
+            }
+
+            if model.isScanning {
+                HStack(alignment: .top, spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Escuchando el iPhone…")
+                            .font(.callout.weight(.semibold))
+                        Text("1. Abre Wallet  ·  2. Toca la tarjeta que quieres personalizar  ·  3. Se vinculará aquí sola")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(model.scanLineCount) líneas de syslog · \(model.walletEventCount) eventos de Wallet")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            if sortedCards.isEmpty {
+                Text("Todavía no hay tarjetas. Pulsa “Detectar desde Wallet” y abre la tarjeta en el iPhone.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(sortedCards) { card in
+                        cardRow(card)
+                    }
+                }
+            }
+
+            DisclosureGroup("Pegar hash manualmente", isExpanded: $showManualEntry) {
+                HStack {
+                    TextField("Hash de la tarjeta (Base64)", text: $model.cardHash)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                    if !model.cardHash.isEmpty {
+                        Image(systemName: model.isCardHashValid ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(model.isCardHashValid ? .green : .red)
+                            .help(model.isCardHashValid ? "Hash válido" : "No parece un hash de Wallet (SHA-1/SHA-256 en Base64)")
+                    }
+                    Button("Guardar") { model.saveManualCard() }
+                        .disabled(!model.isCardHashValid || model.selectedCard != nil)
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption)
+        }
+        .alert("Renombrar tarjeta", isPresented: Binding(
+            get: { renaming != nil },
+            set: { if !$0 { renaming = nil } }
+        )) {
+            TextField("Nombre", text: $renameText)
+            Button("Guardar") {
+                if let card = renaming { model.renameCard(card, to: renameText) }
+                renaming = nil
+            }
+            Button("Cancelar", role: .cancel) { renaming = nil }
+        }
+    }
+
+    private func cardRow(_ card: WalletCard) -> some View {
+        let isSelected = model.selectedCard?.hash == card.hash
+        let isLatest = model.isScanning && model.lastDetectedHash == card.hash
+        return HStack(spacing: 10) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .font(.title3)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 34, height: 22)
+                .overlay { Image(systemName: "creditcard.fill").font(.caption2).foregroundStyle(.white) }
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(card.name).fontWeight(isSelected ? .semibold : .regular)
+                    if isLatest {
+                        Text("RECIÉN ABIERTA")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.green.opacity(0.2), in: Capsule())
+                            .foregroundStyle(.green)
+                    }
+                }
+                HStack(spacing: 6) {
+                    Text(card.shortHash).font(.caption.monospaced())
+                    Text("·")
+                    Text(card.lastSeen, style: .relative) + Text(" atrás")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Menu {
+                Button("Usar esta tarjeta") { model.selectCard(card) }
+                Button("Renombrar…") {
+                    renameText = card.name
+                    renaming = card
+                }
+                Button("Copiar hash") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(card.hash, forType: .string)
+                }
+                Divider()
+                Button("Olvidar", role: .destructive) { model.forgetCard(card) }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { model.selectCard(card) }
+        .help(card.hash)
     }
 }

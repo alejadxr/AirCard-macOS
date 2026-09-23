@@ -38,20 +38,11 @@ struct WalletSkinService: Sendable {
         guard let data = Data(base64Encoded: normalized), data.count == 20 || data.count == 32 else {
             return nil
         }
-        return trimmed.count == 27 ? "\(trimmed)=" : trimmed
+        return trimmed.count == 27 || trimmed.count == 43 ? "\(trimmed)=" : trimmed
     }
 
     func extractCardHash(from line: String) -> String? {
-        let lower = line.lowercased()
-        let walletMarkers = ["passd", "passbook", "passkit", "stockholm", "nanopassd", "wallet", "/cards/"]
-        guard walletMarkers.contains(where: { lower.contains($0) }) else { return nil }
-        guard let regex = try? NSRegularExpression(pattern: #"([A-Za-z0-9+/_-]{27,44}={0,2})"#) else {
-            return nil
-        }
-        let range = NSRange(line.startIndex..<line.endIndex, in: line)
-        guard let match = regex.firstMatch(in: line, range: range),
-              let candidateRange = Range(match.range(at: 1), in: line) else { return nil }
-        return validateCardHash(String(line[candidateRange]))
+        CardHashDetector.detect(in: line)?.hash
     }
 
     func flash(
