@@ -8,9 +8,9 @@ struct DeviceInfo: Identifiable, Hashable, Sendable {
     let build: String
 
     var summary: String {
-        let versionText = version.isEmpty ? "iOS desconocido" : "iOS \(version)"
+        let versionText = version.isEmpty ? AirCardL10n.text("iOS desconocido") : AirCardL10n.format("iOS %@", version)
         let buildText = build.isEmpty ? "" : " (\(build))"
-        return "\(name) · \(product) · \(versionText)\(buildText)"
+        return AirCardL10n.format("%@ · %@ · %@%@", name, product, versionText, buildText)
     }
 
     var majorVersion: Int? {
@@ -18,11 +18,11 @@ struct DeviceInfo: Identifiable, Hashable, Sendable {
     }
 
     var compatibilityNote: String {
-        guard let major = majorVersion else { return "Versión de iOS desconocida" }
+        guard let major = majorVersion else { return AirCardL10n.text("Versión de iOS desconocida") }
         switch major {
-        case 18: return "iOS \(version) · detección compatible (iOS 18)"
-        case 26...: return "iOS \(version) · detección compatible"
-        default: return "iOS \(version) · no probado; la detección puede fallar"
+        case 18: return AirCardL10n.format("iOS %@ · detección compatible (iOS 18)", version)
+        case 26...: return AirCardL10n.format("iOS %@ · detección compatible", version)
+        default: return AirCardL10n.format("iOS %@ · no probado; la detección puede fallar", version)
         }
     }
 
@@ -68,6 +68,27 @@ struct PreparedArtwork: Sendable {
     let sourceHeight: Int
 }
 
+struct CardTextColor: Sendable, Equatable {
+    let red: Int
+    let green: Int
+    let blue: Int
+
+    init(red: Int, green: Int, blue: Int) {
+        self.red = min(max(red, 0), 255)
+        self.green = min(max(green, 0), 255)
+        self.blue = min(max(blue, 0), 255)
+    }
+
+    var passValue: String {
+        "rgb(\(red), \(green), \(blue))"
+    }
+}
+
+struct CardPassMetadata: Sendable {
+    let foregroundColor: String?
+    let labelColor: String?
+}
+
 struct PasscodeTint: Sendable, Equatable {
     let red: Double
     let green: Double
@@ -98,11 +119,11 @@ enum PasscodeLanguage: String, CaseIterable, Hashable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .english: return "English"
-        case .russian: return "Russian (Русский)"
-        case .ukrainian: return "Ukrainian (Українська)"
-        case .japanese: return "Japanese (日本語)"
-        case .universal: return "Universal (todos)"
+        case .english: return AirCardL10n.text("English")
+        case .russian: return AirCardL10n.text("Russian (Русский)")
+        case .ukrainian: return AirCardL10n.text("Ukrainian (Українська)")
+        case .japanese: return AirCardL10n.text("Japanese (日本語)")
+        case .universal: return AirCardL10n.text("Universal (todos)")
         }
     }
 }
@@ -180,21 +201,21 @@ enum AirCardError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .helperMissing:
-            return "No encuentro los helpers nativos de macOS. Ejecuta Scripts/build_helpers.sh."
+            return AirCardL10n.text("No encuentro los helpers nativos de macOS. Ejecuta Scripts/build_helpers.sh.")
         case .invalidHelperOutput(let output):
-            return "El helper devolvió una respuesta inválida: \(output)"
+            return AirCardL10n.format("El helper devolvió una respuesta inválida: %@", output)
         case .noDevice:
-            return "No hay un iPhone emparejado y conectado. Desbloquéalo y pulsa ‘Confiar’."
+            return AirCardL10n.text("No hay un iPhone emparejado y conectado. Desbloquéalo y pulsa ‘Confiar’.")
         case .invalidCardHash:
-            return "El hash de la tarjeta no parece un identificador Base64 válido."
+            return AirCardL10n.text("El hash de la tarjeta no parece un identificador Base64 válido.")
         case .invalidTarget(let target):
-            return "Ruta de destino no permitida: \(target)"
+            return AirCardL10n.format("Ruta de destino no permitida: %@", target)
         case .processFailed(let message):
             return message
         case .airTrafficUnavailable:
-            return "Desbloquea el iPhone, mantén la pantalla encendida y abre Apple Books una vez."
+            return AirCardL10n.text("Desbloquea el iPhone, mantén la pantalla encendida y abre Apple Books una vez.")
         case .cancelled:
-            return "Operación cancelada."
+            return AirCardL10n.text("Operación cancelada.")
         }
     }
 }

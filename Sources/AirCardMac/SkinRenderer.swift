@@ -22,7 +22,7 @@ enum SkinRenderer {
             format: .RGBA8,
             colorSpace: outputSpace
         ) else {
-            throw AirCardError.processFailed("No pude renderizar el diseño.")
+            throw AirCardError.processFailed(AirCardL10n.text("No pude renderizar el diseño."))
         }
         return cgImage
     }
@@ -271,11 +271,11 @@ enum SkinRenderer {
     static func encodePNG(_ image: CGImage) throws -> Data {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-            throw AirCardError.processFailed("No pude crear el PNG de la tarjeta.")
+            throw AirCardError.processFailed(AirCardL10n.text("No pude crear el PNG de la tarjeta."))
         }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else {
-            throw AirCardError.processFailed("No pude finalizar el PNG de la tarjeta.")
+            throw AirCardError.processFailed(AirCardL10n.text("No pude finalizar el PNG de la tarjeta."))
         }
         return data as Data
     }
@@ -285,7 +285,7 @@ enum SkinRenderer {
         var mediaBox = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
               let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
-            throw AirCardError.processFailed("No pude crear el PDF de la tarjeta.")
+            throw AirCardError.processFailed(AirCardL10n.text("No pude crear el PDF de la tarjeta."))
         }
         context.beginPDFPage(nil)
         context.draw(image, in: mediaBox)

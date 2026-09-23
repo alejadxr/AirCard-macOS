@@ -41,22 +41,22 @@ enum SkinBlendMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .normal: return "Normal"
-        case .multiply: return "Multiplicar"
-        case .screen: return "Trama"
-        case .overlay: return "Superponer"
-        case .softLight: return "Luz suave"
-        case .hardLight: return "Luz fuerte"
-        case .colorDodge: return "Sobreexponer color"
-        case .colorBurn: return "Subexponer color"
-        case .add: return "Sumar"
-        case .darken: return "Oscurecer"
-        case .lighten: return "Aclarar"
-        case .difference: return "Diferencia"
-        case .hue: return "Tono"
-        case .saturation: return "Saturación"
-        case .color: return "Color"
-        case .luminosity: return "Luminosidad"
+        case .normal: return AirCardL10n.text("Normal")
+        case .multiply: return AirCardL10n.text("Multiplicar")
+        case .screen: return AirCardL10n.text("Trama")
+        case .overlay: return AirCardL10n.text("Superponer")
+        case .softLight: return AirCardL10n.text("Luz suave")
+        case .hardLight: return AirCardL10n.text("Luz fuerte")
+        case .colorDodge: return AirCardL10n.text("Sobreexponer color")
+        case .colorBurn: return AirCardL10n.text("Subexponer color")
+        case .add: return AirCardL10n.text("Sumar")
+        case .darken: return AirCardL10n.text("Oscurecer")
+        case .lighten: return AirCardL10n.text("Aclarar")
+        case .difference: return AirCardL10n.text("Diferencia")
+        case .hue: return AirCardL10n.text("Tono")
+        case .saturation: return AirCardL10n.text("Saturación")
+        case .color: return AirCardL10n.text("Color")
+        case .luminosity: return AirCardL10n.text("Luminosidad")
         }
     }
 
@@ -88,10 +88,10 @@ enum ImageFit: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .fitBlurred: return "Ajustar con fondo difuminado"
-        case .fill: return "Rellenar"
-        case .fit: return "Ajustar"
-        case .stretch: return "Estirar"
+        case .fitBlurred: return AirCardL10n.text("Ajustar con fondo difuminado")
+        case .fill: return AirCardL10n.text("Rellenar")
+        case .fit: return AirCardL10n.text("Ajustar")
+        case .stretch: return AirCardL10n.text("Estirar")
         }
     }
 }
@@ -102,12 +102,12 @@ enum PatternStyle: Int, Codable, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
     var label: String {
         switch self {
-        case .lines: return "Líneas"
-        case .dots: return "Puntos"
-        case .grid: return "Cuadrícula"
-        case .carbon: return "Fibra de carbono"
-        case .guilloche: return "Guilloché"
-        case .waves: return "Ondas"
+        case .lines: return AirCardL10n.text("Líneas")
+        case .dots: return AirCardL10n.text("Puntos")
+        case .grid: return AirCardL10n.text("Cuadrícula")
+        case .carbon: return AirCardL10n.text("Fibra de carbono")
+        case .guilloche: return AirCardL10n.text("Guilloché")
+        case .waves: return AirCardL10n.text("Ondas")
         }
     }
 }
@@ -208,18 +208,18 @@ enum SkinLayerContent: Codable, Equatable, Sendable {
 
     var kindLabel: String {
         switch self {
-        case .solid: return "Color"
-        case .image: return "Imagen"
-        case .linearGradient: return "Degradado lineal"
-        case .radialGradient: return "Degradado radial"
-        case .conicGradient: return "Degradado cónico"
-        case .meshGradient: return "Mesh gradient"
-        case .holographic: return "Holográfico"
-        case .brushedMetal: return "Metal cepillado"
-        case .sheen: return "Brillo"
-        case .grain: return "Grano"
-        case .pattern: return "Patrón"
-        case .text: return "Texto"
+        case .solid: return AirCardL10n.text("Color")
+        case .image: return AirCardL10n.text("Imagen")
+        case .linearGradient: return AirCardL10n.text("Degradado lineal")
+        case .radialGradient: return AirCardL10n.text("Degradado radial")
+        case .conicGradient: return AirCardL10n.text("Degradado cónico")
+        case .meshGradient: return AirCardL10n.text("Mesh gradient")
+        case .holographic: return AirCardL10n.text("Holográfico")
+        case .brushedMetal: return AirCardL10n.text("Metal cepillado")
+        case .sheen: return AirCardL10n.text("Brillo")
+        case .grain: return AirCardL10n.text("Grano")
+        case .pattern: return AirCardL10n.text("Patrón")
+        case .text: return AirCardL10n.text("Texto")
         }
     }
 
@@ -275,7 +275,7 @@ struct SkinDocument: Codable, Equatable, Sendable {
     static let canvasSize = CGSize(width: 1_536, height: 969)
     static let canvas2xSize = CGSize(width: 1_024, height: 646)
 
-    var name: String = "Sin título"
+    var name: String = AirCardL10n.text("Sin título")
     var layers: [SkinLayer] = []
     var adjustments = SkinAdjustments()
     var tilt: Double = 0.5

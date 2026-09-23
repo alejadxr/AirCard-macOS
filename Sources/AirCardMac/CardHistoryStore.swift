@@ -112,7 +112,7 @@ enum SkinFile {
         do {
             return try JSONDecoder().decode(SkinDocument.self, from: data)
         } catch {
-            throw AirCardError.processFailed("El archivo .\(SkinDocument.fileExtension) no es válido: \(error.localizedDescription)")
+            throw AirCardError.processFailed(AirCardL10n.format("El archivo .%@ no es válido: %@", SkinDocument.fileExtension, error.localizedDescription))
         }
     }
 }

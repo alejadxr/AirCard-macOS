@@ -63,7 +63,7 @@ enum DeviceLogScanner {
                     }
                     process.waitUntilExit()
                     if !Task.isCancelled && process.terminationStatus != 0 {
-                        throw AirCardError.processFailed("El monitor de syslog terminó con código \(process.terminationStatus).")
+                        throw AirCardError.processFailed(AirCardL10n.format("El monitor de syslog terminó con código %d.", process.terminationStatus))
                     }
                     continuation.finish()
                 } catch is CancellationError {

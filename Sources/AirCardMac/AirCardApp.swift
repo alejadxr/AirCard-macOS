@@ -7,6 +7,7 @@ struct AirCardMacApp: App {
     var body: some Scene {
         WindowGroup("AirCard") {
             RootView(model: model)
+                .environment(\.locale, AirCardL10n.locale)
         }
         .defaultSize(width: 1_320, height: 840)
         .windowToolbarStyle(.unified)
@@ -54,7 +55,7 @@ struct AirCardCommands: Commands {
             }
             Menu("Estilos") {
                 ForEach(SkinPresets.all) { preset in
-                    Button(preset.name) { studio.applyPreset(preset) }
+                    Button(AirCardL10n.text(preset.name)) { studio.applyPreset(preset) }
                 }
             }
             Divider()

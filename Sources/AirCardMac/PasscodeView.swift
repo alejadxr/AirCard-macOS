@@ -84,7 +84,9 @@ struct PasscodeView: View {
             }
         }
         .frame(width: 72, height: 72)
-        .help(tile.image == nil ? "El tema no trae la tecla \(tile.key)" : "Tecla \(tile.key)")
+        .help(tile.image == nil
+            ? AirCardL10n.format("El tema no trae la tecla %@", tile.key)
+            : AirCardL10n.format("Tecla %@", tile.key))
     }
 
     private var settings: some View {
@@ -120,7 +122,7 @@ struct PasscodeView: View {
                 Text("Usa el idioma del teclado del iPhone. Auto elige la caché según la versión de iOS: 18+ → 10, 16–17 → 9, anteriores → 8.")
             }
             if !model.passcodePlannedFiles.isEmpty {
-                Section("\(model.passcodePlannedFiles.count) archivos en \(model.passcodeResolvedCache)") {
+                Section(AirCardL10n.format("%d archivos en %@", model.passcodePlannedFiles.count, model.passcodeResolvedCache)) {
                     ScrollView {
                         Text(model.passcodePlannedFiles.joined(separator: "\n"))
                             .font(.system(.caption, design: .monospaced))

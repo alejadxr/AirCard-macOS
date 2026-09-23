@@ -182,7 +182,7 @@ private struct DeviceRow: View {
                     .pickerStyle(.menu)
                     .onChange(of: model.selectedDeviceID) { _, _ in model.recolorPasscodePreview() }
                 } else {
-                    Text(model.selectedDevice?.name ?? "Sin iPhone")
+                    Text(AirCardL10n.text(model.selectedDevice?.name ?? "Sin iPhone"))
                         .fontWeight(.medium)
                         .lineLimit(1)
                 }
@@ -229,7 +229,7 @@ private struct ScanStatusRow: View {
                 Text("Abre Wallet y toca la tarjeta")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("\(model.walletEventCount) eventos · \(model.scanLineCount) líneas")
+                Text(AirCardL10n.format("%d eventos · %d líneas", model.walletEventCount, model.scanLineCount))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
@@ -249,7 +249,7 @@ private struct CardSidebarRow: View {
             CardThumbnail(image: thumbnail, width: 44)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    Text(card.name)
+                    Text(AirCardL10n.cardName(card.name))
                         .lineLimit(1)
                     if isFresh {
                         Circle().fill(.green).frame(width: 6, height: 6)

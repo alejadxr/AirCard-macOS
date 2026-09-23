@@ -1000,6 +1000,11 @@ static NSDictionary *FinishWrite(DeviceSession *session, NSArray<NSString *> *ar
     NSString *linkDestination = args[1];
     NSString *recovered = args[2];
     NSString *snapshotRoot = args[3];
+    BOOL safeArguments = GeneratedNamesMatch(source, linkDestination, recovered) &&
+        LoadBooksSnapshot(snapshotRoot) != nil;
+    if (!safeArguments)
+        return @{ @"ok": @NO, @"safeArguments": @NO };
+
     NSMutableArray<NSString *> *failures = NSMutableArray.array;
 
     if (!RemoveIfPresent(session->afc, linkDestination))
@@ -1018,6 +1023,7 @@ static NSDictionary *FinishWrite(DeviceSession *session, NSArray<NSString *> *ar
     BOOL recoveredAbsent = !AFCExists(session->afc, recovered);
     BOOL cleanupComplete = failures.count == 0 && sourceAbsent && linkAbsent && recoveredAbsent && booksRestored;
     return @{ @"ok": @(cleanupComplete),
+              @"safeArguments": @YES,
               @"cleanupComplete": @(cleanupComplete),
               @"failures": failures,
               @"sourceAbsent": @(sourceAbsent),
@@ -1025,6 +1031,47 @@ static NSDictionary *FinishWrite(DeviceSession *session, NSArray<NSString *> *ar
               @"recoveredAbsent": @(recoveredAbsent),
               @"booksPreimageRestored": @(booksRestored),
               @"booksRestore": booksRestore };
+}
+
+static NSDictionary *FinishMovedRemoval(DeviceSession *session,
+                                        NSArray<NSString *> *args) {
+    NSString *source = args[0];
+    NSString *linkDestination = args[1];
+    NSString *recovered = args[2];
+    NSString *snapshotRoot = args[3];
+    NSInteger expectedCount = [args[4] integerValue];
+    BOOL safeArguments = GeneratedNamesMatch(source, linkDestination, recovered) &&
+        expectedCount > 0 && expectedCount <= 32 &&
+        LoadBooksSnapshot(snapshotRoot) != nil;
+    if (!safeArguments) return @{@"ok": @NO, @"safeArguments": @NO};
+
+    NSMutableArray<NSString *> *missing = NSMutableArray.array;
+    for (NSInteger index = 0; index < expectedCount; index++) {
+        NSString *path = [source stringByAppendingPathComponent:
+            [NSString stringWithFormat:@"removed-%ld", (long)index]];
+        if (!AFCExists(session->afc, path)) [missing addObject:path];
+    }
+
+    NSMutableArray<NSString *> *failures = NSMutableArray.array;
+    if (!RemoveIfPresent(session->afc, linkDestination))
+        [failures addObject:@"relocated link"];
+    if (!RemoveIfPresent(session->afc, recovered))
+        [failures addObject:@"recovered file"];
+    if (!RemoveGeneratedTree(session->afc, source, 0))
+        [failures addObject:@"StreamingZip tree"];
+    NSDictionary *booksRestore = RestoreBooksState(session->afc, snapshotRoot);
+    if (![booksRestore[@"ok"] boolValue]) [failures addObject:@"Books preimage"];
+
+    BOOL cleanupComplete = failures.count == 0;
+    return @{@"ok": @(cleanupComplete),
+             @"safeArguments": @YES,
+             @"movedCount": @(expectedCount - missing.count),
+             @"alreadyAbsentCount": @(missing.count),
+             @"allTargetsMoved": @(missing.count == 0),
+             @"missing": missing,
+             @"cleanupComplete": @(cleanupComplete),
+             @"failures": failures,
+             @"booksRestore": booksRestore};
 }
 
 int main(int argc, const char *argv[]) {
@@ -1103,6 +1150,14 @@ int main(int argc, const char *argv[]) {
                     [NSString stringWithUTF8String:argv[4]],
                     [NSString stringWithUTF8String:argv[5]],
                     [NSString stringWithUTF8String:argv[6]],
+                ]);
+            } else if ([command isEqual:@"finish-moved-removal"] && argc == 8) {
+                operation = FinishMovedRemoval(&session, @[
+                    [NSString stringWithUTF8String:argv[3]],
+                    [NSString stringWithUTF8String:argv[4]],
+                    [NSString stringWithUTF8String:argv[5]],
+                    [NSString stringWithUTF8String:argv[6]],
+                    [NSString stringWithUTF8String:argv[7]],
                 ]);
             }
         }

@@ -9,6 +9,14 @@ detección del iPhone, preparación de imágenes y escritura atómica.
 > de hash de tarjetas también soporta iOS 18 (incluido 18.7.8). El proyecto usa
 > APIs privadas de Apple y es experimental; no es una herramienta oficial.
 
+## Idioma
+
+La app incluye español y portugués de Brasil (`pt-BR`). Para cambiar solo
+AirCard, abre **Ajustes del Sistema → General → Idioma y región → Aplicaciones**,
+añade AirCard y selecciona **Português (Brasil)**; luego cierra y vuelve a abrir
+la app. También seguirá el idioma preferido de macOS si no configuras uno por
+app.
+
 ## Ejecutar
 
 Desde esta carpeta:
@@ -156,3 +164,10 @@ artwork y limpia las cachés de Wallet. La build actual escribe además los
 assets canónicos `diffuse`, `background` y `strip`, siguiendo el port iOS
 relacionado, porque algunas variantes de Wallet pueden leer esos nombres en
 lugar de `cardBackgroundCombined`.
+
+La interfaz incluye ahora una ruta experimental separada para el texto de los
+números: primero intenta leer `pass.json` y luego puede cambiar únicamente
+`foregroundColor`. Esto no utiliza `.passthm` ni overlays. Apple documenta
+`foregroundColor` para el texto de los campos de un pass normal, pero una tarjeta
+Apple Pay puede mantener su color verde o ignorar el cambio si iOS valida la
+firma del paquete.

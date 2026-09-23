@@ -16,7 +16,7 @@ struct StudioView: View {
                 .inspectorColumnWidth(min: 300, ideal: 330, max: 420)
         }
         .navigationTitle(studio.document.name)
-        .navigationSubtitle(studio.isDirty ? "Editado" : "")
+        .navigationSubtitle(studio.isDirty ? AirCardL10n.text("Editado") : "")
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button { studio.undo() } label: { Image(systemName: "arrow.uturn.backward") }
@@ -29,7 +29,7 @@ struct StudioView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
                     Button("Nuevo diseño") { studio.newDocument() }
-                    Button("Abrir .\(SkinDocument.fileExtension)…") { studio.open() }
+                    Button(AirCardL10n.format("Abrir .%@…", SkinDocument.fileExtension)) { studio.open() }
                     Divider()
                     Button("Guardar") { studio.save() }
                     Button("Guardar como…") { studio.save(as: true) }
@@ -50,12 +50,14 @@ struct StudioView: View {
                 Button {
                     model.isBusy ? model.cancel() : model.flashSkin()
                 } label: {
-                    Label(model.isBusy ? "Cancelar" : "Aplicar", systemImage: model.isBusy ? "xmark.circle" : "iphone.and.arrow.forward")
+                    Label(AirCardL10n.text(model.isBusy ? "Cancelar" : "Aplicar"), systemImage: model.isBusy ? "xmark.circle" : "iphone.and.arrow.forward")
                         .labelStyle(.titleAndIcon)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!model.isBusy && (model.selectedDeviceID.isEmpty || !model.isCardHashValid))
-                .help(model.isCardHashValid ? "Escribir el diseño en «\(model.targetCardLabel)»" : "Primero elige una tarjeta en la barra lateral")
+                .help(model.isCardHashValid
+                    ? AirCardL10n.format("Escribir el diseño en «%@»", model.targetCardLabel)
+                    : AirCardL10n.text("Primero elige una tarjeta en la barra lateral"))
 
                 Button {
                     studio.showInspector.toggle()
@@ -89,14 +91,14 @@ private struct TargetCardMenu: View {
                     model.selectCard(card)
                 } label: {
                     if model.selectedCard?.hash == card.hash {
-                        Label(card.name, systemImage: "checkmark")
+                        Label(AirCardL10n.cardName(card.name), systemImage: "checkmark")
                     } else {
-                        Text(card.name)
+                        Text(AirCardL10n.cardName(card.name))
                     }
                 }
             }
         } label: {
-            Label(model.isCardHashValid ? model.targetCardLabel : "Elegir tarjeta", systemImage: "creditcard")
+            Label(AirCardL10n.text(model.isCardHashValid ? model.targetCardLabel : "Elegir tarjeta"), systemImage: "creditcard")
                 .labelStyle(.titleAndIcon)
         }
         .help("Tarjeta destino")
@@ -220,7 +222,9 @@ struct CardCanvas: View {
             .toggleStyle(.button)
             .help("Muestra la franja visible en la pila de Wallet y las esquinas")
 
-            Text(studio.usesTilt ? "Arrastra la tarjeta para ver los reflejos" : "1536 × 969 · PNG 3x/2x + PDF")
+            Text(studio.usesTilt
+                ? AirCardL10n.text("Arrastra la tarjeta para ver los reflejos")
+                : AirCardL10n.text("1536 × 969 · PNG 3x/2x + PDF"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -282,9 +286,9 @@ private struct PresetStrip: View {
                             .clipShape(CardShape())
                             .overlay(CardShape().stroke(.white.opacity(0.15), lineWidth: 0.5))
                             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                            Text(preset.name)
+                            Text(AirCardL10n.text(preset.name))
                                 .font(.caption.weight(.semibold))
-                            Text(preset.subtitle)
+                            Text(AirCardL10n.text(preset.subtitle))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -292,7 +296,9 @@ private struct PresetStrip: View {
                         .frame(width: 128, alignment: .leading)
                     }
                     .buttonStyle(.plain)
-                    .help(studio.hasPhoto ? "Aplicar \(preset.name) conservando tu foto cuando el estilo la usa" : "Aplicar \(preset.name)")
+                    .help(studio.hasPhoto
+                        ? AirCardL10n.format("Aplicar %@ conservando tu foto cuando el estilo la usa", AirCardL10n.text(preset.name))
+                        : AirCardL10n.format("Aplicar %@", AirCardL10n.text(preset.name)))
                 }
             }
             .padding(.horizontal, 20)

@@ -19,6 +19,10 @@ lipo -create \
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/bin/device_helper" "$APP/Contents/Resources/bin/device_helper"
 cp "$ROOT/Resources/bin/airtraffic_host" "$APP/Contents/Resources/bin/airtraffic_host"
+for localization in "$ROOT"/Resources/*.lproj; do
+  [[ -d "$localization" ]] || continue
+  cp -R "$localization" "$APP/Contents/Resources/"
+done
 chmod +x "$APP/Contents/MacOS/AirCardMac" "$APP/Contents/Resources/bin/"*
 # The checked-in Assets.car is the Xcode/Icon Composer artifact. The local
 # fallback uses the same layered vector source rendered into AirCardIcon.icns
@@ -34,7 +38,7 @@ cp -R "$ROOT/Resources/AirCardIcon.icon" "$APP/Contents/Resources/AirCardIcon.ic
 # workspace. Strip only the known code-signing-incompatible attributes before
 # signing; do not remove anything from the user's wider filesystem.
 xattr -cr "$APP" 2>/dev/null || true
-for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P; do
+for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P com.apple.provenance; do
   xattr -d "$attribute" "$APP" 2>/dev/null || true
   xattr -dr "$attribute" "$APP" 2>/dev/null || true
 done
@@ -42,6 +46,7 @@ done
 # clear them once more immediately before sealing the app.
 xattr -d com.apple.FinderInfo "$APP" 2>/dev/null || true
 xattr -d 'com.apple.fileprovider.fpfs#P' "$APP" 2>/dev/null || true
+xattr -dr com.apple.provenance "$APP" 2>/dev/null || true
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 

@@ -38,7 +38,7 @@ struct SliderRow: View {
                     .frame(width: 42, alignment: .trailing)
             }
         } label: {
-            Text(title)
+            Text(AirCardL10n.text(title))
         }
     }
 }
@@ -48,7 +48,7 @@ struct ColorRow: View {
     @Binding var color: SkinColor
 
     var body: some View {
-        ColorPicker(title, selection: Binding(
+        ColorPicker(AirCardL10n.text(title), selection: Binding(
             get: { color.swiftUIColor },
             set: { color = SkinColor($0) }
         ), supportsOpacity: true)

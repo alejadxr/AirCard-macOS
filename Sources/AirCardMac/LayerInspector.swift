@@ -44,7 +44,7 @@ struct LayerListView: View {
                         .tag(layer.id)
                         .contextMenu {
                             Button("Duplicar") { studio.duplicateLayer(layer.id) }
-                            Button(layer.isVisible ? "Ocultar" : "Mostrar") { studio.toggleVisibility(layer.id) }
+                            Button(AirCardL10n.text(layer.isVisible ? "Ocultar" : "Mostrar")) { studio.toggleVisibility(layer.id) }
                             Divider()
                             Button("Eliminar", role: .destructive) { studio.removeLayer(layer.id) }
                         }
@@ -116,7 +116,7 @@ private struct LayerRow: View {
                 .frame(width: 18)
                 .foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 1) {
-                Text(layer.name).lineLimit(1)
+                Text(AirCardL10n.text(layer.name)).lineLimit(1)
                 Text("\(layer.content.kindLabel) · \(layer.blend.label) · \(PercentFormat.percent(layer.opacity))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)

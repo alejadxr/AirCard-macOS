@@ -11,7 +11,7 @@ trap 'rm -rf "$STAGING"' EXIT
 
 ditto --norsrc --noextattr --noqtn "$APP" "$STAGING/AirCardMac.app"
 xattr -cr "$STAGING/AirCardMac.app" 2>/dev/null || true
-for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P; do
+for attribute in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P com.apple.provenance; do
   xattr -dr "$attribute" "$STAGING/AirCardMac.app" 2>/dev/null || true
 done
 codesign --verify --deep --strict "$STAGING/AirCardMac.app"
